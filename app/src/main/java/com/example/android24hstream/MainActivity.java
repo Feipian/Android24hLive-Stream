@@ -3,13 +3,17 @@ package com.example.android24hstream;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.widget.Button;
+import android.widget.MediaController;
 import android.widget.Toast;
+import android.widget.VideoView;
+import android.view.View; // Import View
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -20,11 +24,35 @@ public class MainActivity extends AppCompatActivity {
 
     private ActivityResultLauncher<String[]> requestPermissionLauncher;
     private ActivityResultLauncher<Intent> selectVideoIntentLauncher;
+    private VideoView videoView; // Declare VideoView
+    private MediaController mediaController; // Declare MediaController
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main); // Ensure you have a layout
+
+        videoView = findViewById(R.id.video_view); // Initialize VideoView
+
+        // Initialize MediaController
+        mediaController = new MediaController(this);
+        mediaController.setAnchorView(videoView); // Attach MediaController to VideoView
+        videoView.setMediaController(mediaController); // Set MediaController for VideoView
+
+        videoView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (videoView.isPlaying() || videoView.getCurrentPosition() > 0) { // Only show if video is loaded/playing
+                    if (mediaController.isShowing()) {
+                        mediaController.hide();
+                    } else {
+                        // Show for 5 seconds (5000 milliseconds)
+                        mediaController.show(5000);
+                    }
+                }
+            }
+        });
+
 
         // Initialize the Activity Result Launcher for requesting permissions
         requestPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> {
@@ -67,9 +95,18 @@ public class MainActivity extends AppCompatActivity {
         selectVideoIntentLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
                 Uri videoUri = result.getData().getData();
+                Log.d("VideoSelection", "Selected video URI: " + videoUri);
                 if (videoUri != null) {
                     Log.d("VideoSelection", "Selected video URI: " + videoUri);
                     // Process the selected video URI here
+                    videoView.setVideoURI(videoUri); // Set the video source
+                    videoView.setVisibility(View.VISIBLE); // Make the VideoView visible
+//                    videoView.start(); // Start playing the video
+                    // Optionally, you can set focus to the videoView so controls appear immediately
+                    videoView.requestFocus();
+
+//                    mediaController.show();
+
                 }
             } else {
                 Log.d("VideoSelection", "Video selection cancelled or failed.");
