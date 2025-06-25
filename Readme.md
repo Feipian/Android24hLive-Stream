@@ -3,6 +3,7 @@
 ## TODO:
 - [X] SELECT VIDEO PERMISSION
 - [ ] YOUTUBE LIVE STREAM
+  - [ ] Can Choice google account but cant access google cloud console service 
 - [X] How to show the video i choice??
 
 
