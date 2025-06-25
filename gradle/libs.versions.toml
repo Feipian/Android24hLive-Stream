@@ -1,30 +1,38 @@
 [versions]
 agp = "8.10.1"
+appcompatV7 = "28.0.0"
+easypermissions = "0.3.0"
 fragmentKtx = "1.8.8"
 googleApiClientAndroid = "1.32.1"
 googleApiServicesYoutube = "v3-rev222-1.25.0"
+googleHttpClientAndroid = "1.44.1"
+googleOauthClientJetty = "1.36.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
-appcompat = "1.6.1"
+appcompat = "1.7.1"
 material = "1.10.0"
-activity = "1.8.0"
+activity = "1.10.1"
 constraintlayout = "2.1.4"
 playServicesAuth = "21.3.0"
 playServicesAuthVersion = "20.7.0"
 
 [libraries]
 activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activity" }
+appcompat-v7 = { module = "com.android.support:appcompat-v7", version.ref = "appcompatV7" }
+easypermissions = { module = "pub.devrel:easypermissions", version = "3.0.0" }
 fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragmentKtx" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version.ref = "googleApiClientAndroid" }
 google-api-services-youtube = { module = "com.google.apis:google-api-services-youtube", version.ref = "googleApiServicesYoutube" }
+google-http-client-android = { module = "com.google.api.client:google-http-client-android", version.ref = "googleHttpClientAndroid" }
+google-oauth-client-jetty = { module = "com.google.oauth-client:google-oauth-client-jetty", version.ref = "googleOauthClientJetty" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version = "2.2.1" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 play-services-auth-v2070 = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuthVersion" }
 

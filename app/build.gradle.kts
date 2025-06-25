@@ -1,3 +1,4 @@
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -61,5 +62,45 @@ dependencies {
     implementation(libs.activity.ktx)
     implementation(libs.fragment.ktx)
 
+    // https://mvnrepository.com/artifact/com.google.oauth-client/google-oauth-client-jetty
+    implementation(libs.google.oauth.client.jetty)
+
+
+    // compile fileTree(dir: 'libs', include: ['*.jar'])
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+
+    // compile 'com.android.support:appcompat-v7:25.0.1'
+    // Note: com.android.support is deprecated. You should use androidx libraries
+    // if possible. This is the direct conversion.
+    implementation(libs.appcompat.v7)
+
+    // compile 'com.google.android.gms:play-services-auth:21.3.0'
+    implementation(libs.play.services.auth)
+
+    // compile 'pub.devrel:easypermissions:0.3.0'
+    implementation(libs.easypermissions)
+
+    // compile('com.google.api-client:google-api-client-android:1.22.0') {
+    // exclude group: 'org.apache.httpcomponents'
+    // }
+
+    implementation("com.google.api-client:google-api-client-android:1.22.0"){
+        exclude(group= "org.apache.httpcomponents")
+    }
+
+    // compile('com.google.apis:google-api-services-youtube:v3-rev183-1.22.0') {
+    // exclude group: 'org.apache.httpcomponents'
+    // }
+    implementation("com.google.apis:google-api-services-youtube:v3-rev183-1.22.0") {
+        exclude(group = "org.apache.httpcomponents")
 
     }
+
+
+    implementation("com.google.api-client:google-api-client-android:1.32.1") { // Check Maven Central for the absolute latest
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+
+
+}
