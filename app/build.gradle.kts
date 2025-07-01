@@ -1,3 +1,4 @@
+import androidx.room.vo.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -15,6 +16,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+
     }
 
     buildTypes {
@@ -52,6 +55,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
+    implementation(libs.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

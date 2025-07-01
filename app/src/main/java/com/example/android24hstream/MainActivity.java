@@ -70,6 +70,7 @@ import com.google.api.services.youtube.model.LiveBroadcastListResponse;
 import com.google.api.services.youtube.model.LiveBroadcastSnippet;
 import com.google.api.services.youtube.model.LiveBroadcastStatus;
 import com.google.api.services.youtube.model.LiveStream;
+import com.google.api.services.youtube.model.LiveStreamContentDetails;
 import com.google.api.services.youtube.model.LiveStreamSnippet;
 
 import java.io.IOException;
@@ -94,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
     private Uri selectedVideoUri;
 
     private ExecutorService executorService;
+    private String googleApiKey = buildconfig.googleApiKey;
     private Handler mainHandler; // For posting results to the UI thread
     // Quickstart related fields
     private GoogleAccountCredential mCredential;
@@ -175,6 +177,7 @@ public class MainActivity extends AppCompatActivity {
                 throw new RuntimeException(e);
             }
         });
+
 
         // Initialize ExecutorService and Handler
         executorService = Executors.newFixedThreadPool(2); // Or a cached thread pool if many short tasks
@@ -458,6 +461,10 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    /**
+     * When select board cast, we will go to this method
+     * @param broadcast
+     */
     private void onBroadcastSelected(YouTubeBroadcast broadcast) {
         Log.d("SelectedBroadcast", "ID: " + broadcast.getId() + ", Title: " + broadcast.getTitle());
         // Example: Start streaming to this broadcast
@@ -466,7 +473,90 @@ public class MainActivity extends AppCompatActivity {
         // You can now use broadcast.getId() to bind your stream:
         // String streamId = broadcast.getId();
         // startStreaming(streamId);
+
+        // then we create a new stream for this broadcast
+        createStream();
     }
+
+
+
+    private void createStream() {
+        Log.d(TAG, "Attempting to create a new YouTube Live Stream for an existing broadcast...");
+        mOutputText.setText("Attempting to create a new Live Stream...");
+
+        if (youtubeService == null) {
+            Log.e(TAG, "YouTube service not initialized for createStream.");
+            mOutputText.setText("Error: YouTube service not initialized.");
+            return;
+        }
+
+        executorService.execute(() -> {
+            Exception currentAsyncError = null;
+            String newStreamId = null;
+            String newRtmpUrl = null;
+            String newStreamKey = null;
+            String resultString = null;
+
+            mainHandler.post(() -> {
+                mProgress.setMessage("Creating new live stream...");
+                mProgress.show();
+            });
+
+            try {
+                // --- Create New Live Stream ---
+                LiveStream liveStream = new LiveStream();
+
+                // Add the cdn object property to the LiveStream object.
+                CdnSettings cdn = new CdnSettings();
+                cdn.setFrameRate("60fps");
+                cdn.setIngestionType("rtmp");
+                cdn.setResolution("1080p");
+                liveStream.setCdn(cdn);
+
+                // Add the contentDetails object property to the LiveStream object.
+                LiveStreamContentDetails contentDetails = new LiveStreamContentDetails();
+                contentDetails.setIsReusable(true);
+                liveStream.setContentDetails(contentDetails);
+
+                // Add the snippet object property to the LiveStream object.
+                LiveStreamSnippet snippet = new LiveStreamSnippet();
+                snippet.setDescription("A description of your video stream. This field is optional.");
+                snippet.setTitle("Your new video stream's name");
+                liveStream.setSnippet(snippet);
+
+                // Define and execute the API request
+                YouTube.LiveStreams.Insert request = youtubeService.liveStreams()
+                        .insert("snippet,cdn,contentDetails,status", liveStream);
+                LiveStream response = request.setKey(DEVELOPER_KEY).execute();
+
+//                YouTube.LiveStreams.Insert streamInsertRequest = youtubeService.liveStreams()
+//                        .insert("snippet,cdnSettings", liveStream);
+//                LiveStream createdStream = streamInsertRequest.execute();
+//
+//                newStreamId = createdStream.getId();
+//                newRtmpUrl = createdStream.getCdn().getIngestionInfo().getIngestionAddress();
+//                newStreamKey = createdStream.getCdn().getIngestionInfo().getStreamName();
+//                Log.d(TAG, "New Live Stream created: " + newStreamId);
+//                Log.d(TAG, "New RTMP URL: " + newRtmpUrl + "/" + newStreamKey);
+//
+//                resultString = "New Stream created successfully. ID: " + newStreamId +
+//                        "\nRTMP: " + newRtmpUrl + "/" + newStreamKey;
+
+                // Note: We don't bind it here. Binding happens when the user selects a broadcast.
+                // The user needs to choose which broadcast to bind this new stream to.
+
+            } catch (IOException e) {
+                currentAsyncError = e;
+                resultString = "Error creating new stream: " + e.getMessage();
+                Log.e(TAG, "Error in createStream", e);
+            } finally {
+                final String finalResult = resultString;
+                // ... (Update UI on mainHandler similar to startStream's finally block)
+                mainHandler.post(() -> mProgress.dismiss());
+            }
+        });
+    }
+
     private void showBroadcastSelectionDialog(List<YouTubeBroadcast> broadcasts) {
         if (broadcasts.isEmpty()) {
             Toast.makeText(this, "No broadcasts found", Toast.LENGTH_SHORT).show();
