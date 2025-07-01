@@ -70,6 +70,7 @@ import com.google.api.services.youtube.model.LiveBroadcastListResponse;
 import com.google.api.services.youtube.model.LiveBroadcastSnippet;
 import com.google.api.services.youtube.model.LiveBroadcastStatus;
 import com.google.api.services.youtube.model.LiveStream;
+import com.google.api.services.youtube.model.LiveStreamContentDetails;
 import com.google.api.services.youtube.model.LiveStreamSnippet;
 
 import java.io.IOException;
@@ -461,11 +462,116 @@ public class MainActivity extends AppCompatActivity {
     private void onBroadcastSelected(YouTubeBroadcast broadcast) {
         Log.d("SelectedBroadcast", "ID: " + broadcast.getId() + ", Title: " + broadcast.getTitle());
         // Example: Start streaming to this broadcast
-        Toast.makeText(this, "Selected: " + broadcast.getTitle(), Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Selected: " + broadcast.getTitle() + ". Preparing to stream.", Toast.LENGTH_LONG).show();
 
-        // You can now use broadcast.getId() to bind your stream:
-        // String streamId = broadcast.getId();
-        // startStreaming(streamId);
+        // Ensure a video is selected
+        if (selectedVideoUri == null) {
+            mOutputText.setText("Please select a video first using the 'Select Video' button.");
+            Toast.makeText(this, "Please select a video first.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        // Create a new stream and bind it to the selected broadcast
+        final String selectedBroadcastId = broadcast.getId();
+        executorService.execute(() -> {
+            String currentRtmpUrl = null;
+            String currentStreamKey = null;
+            Exception currentAsyncError = null;
+
+            mainHandler.post(() -> {
+                mProgress.setMessage("Creating and binding live stream to: " + broadcast.getTitle());
+                mProgress.show();
+            });
+
+            try {
+                // Define the LiveStream object, which will be uploaded as the request body.
+                LiveStream liveStream = new LiveStream();
+
+                // Add the cdn object property to the LiveStream object.
+                CdnSettings cdn = new CdnSettings();
+                cdn.setFrameRate("60fps");
+                cdn.setIngestionType("rtmp");
+                cdn.setResolution("1080p");
+                liveStream.setCdn(cdn);
+
+                // Add the contentDetails object property to the LiveStream object.
+                LiveStreamContentDetails contentDetails = new LiveStreamContentDetails();
+                contentDetails.setIsReusable(true);
+                liveStream.setContentDetails(contentDetails);
+
+                // Add the snippet object property to the LiveStream object.
+                LiveStreamSnippet snippet = new LiveStreamSnippet();
+                snippet.setDescription("A description of your video stream. This field is optional.");
+                snippet.setTitle("Your new video stream's name");
+                liveStream.setSnippet(snippet);
+
+                // Define and execute the API request
+                YouTube.LiveStreams.Insert request = youtubeService.liveStreams()
+                        .insert("snippet,cdn,contentDetails,status", liveStream);
+                LiveStream response = request.setKey(BuildConfig.API_KEY).execute();
+                System.out.println(response);
+
+
+                // --- NEW CODE: Extract RTMP URL and Stream Key ---
+                if (response != null && response.getCdn() != null && response.getCdn().getIngestionInfo() != null) {
+                    currentRtmpUrl = response.getCdn().getIngestionInfo().getIngestionAddress();
+                    currentStreamKey = response.getCdn().getIngestionInfo().getStreamName();
+                    Log.d(TAG, "Successfully created stream. RTMP URL: " + currentRtmpUrl + ", Stream Key: " + currentStreamKey);
+                } else {
+                    Log.e(TAG, "Stream created but could not retrieve RTMP details from response.");
+                    // You might want to throw an exception or set an error flag here
+                }
+
+                YouTube.LiveBroadcasts.Bind bindRequest = youtubeService.liveBroadcasts()
+                        .bind(selectedBroadcastId, "id,contentDetails"); // Use the ID of the selected broadcast
+                assert response != null;
+                bindRequest.setStreamId(response.getId()); // Use the ID of the newly created stream
+                LiveBroadcast boundBroadcast = bindRequest.execute();
+                Log.d(TAG, "Existing broadcast " + boundBroadcast.getId() + " bound to new stream: " + response.getId());
+
+
+//                // --- 3. Bind Live Broadcast to Live Stream ---
+//                YouTube.LiveBroadcasts.Bind bindRequest = youtubeService.liveBroadcasts()
+//                        .bind(selectedBroadcastId, "id,contentDetails"); // Use the ID of the selected broadcast
+//                bindRequest.setStreamId(createdStream.getId());
+//                LiveBroadcast boundBroadcast = bindRequest.execute();
+//                Log.d(TAG, "Existing broadcast " + boundBroadcast.getId() + " bound to new stream: " + createdStream.getId());
+
+            } catch (GooglePlayServicesAvailabilityIOException e) {
+                currentAsyncError = e;
+                mainHandler.post(() -> showGooglePlayServicesAvailabilityErrorDialog(e.getConnectionStatusCode()));
+            } catch (UserRecoverableAuthIOException e) {
+                currentAsyncError = e;
+                mainHandler.post(() -> authorizationLauncher.launch(e.getIntent()));
+            } catch (IOException e) {
+                currentAsyncError = e;
+                Log.e(TAG, "IOException during stream creation/binding for existing broadcast", e);
+            } catch (Exception e) {
+                currentAsyncError = e;
+                Log.e(TAG, "Unexpected exception during stream creation/binding for existing broadcast", e);
+            } finally {
+                final String finalRtmpUrl = currentRtmpUrl;
+                final String finalStreamKey = currentStreamKey;
+                final Exception finalError = currentAsyncError;
+                final Uri finalSelectedVideoUri = selectedVideoUri;
+
+                mainHandler.post(() -> {
+                    mProgress.dismiss();
+                    if (finalError != null) {
+                        if (!(finalError instanceof UserRecoverableAuthIOException)) {
+                            mOutputText.setText("Error setting up stream for selected broadcast: " + finalError.getMessage());
+                            Log.e(TAG, "Error setting up stream for selected broadcast", finalError);
+                        }
+                    } else if (finalRtmpUrl != null && finalStreamKey != null && finalSelectedVideoUri != null) {
+                        mOutputText.setText("Stream ready for broadcast '" + broadcast.getTitle() + "'. RTMP: " + finalRtmpUrl + "/" + finalStreamKey);
+                        startRtmpStreaming(finalRtmpUrl, finalStreamKey, selectedBroadcastId, finalSelectedVideoUri);
+                    } else {
+                        mOutputText.setText("Failed to get RTMP details for selected broadcast.");
+                        Log.e(TAG, "Failed to get RTMP details for selected broadcast.");
+                    }
+                });
+            }
+        });
     }
     private void showBroadcastSelectionDialog(List<YouTubeBroadcast> broadcasts) {
         if (broadcasts.isEmpty()) {
@@ -625,7 +731,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Check that Google Play services APK is installed and up to date.
-     * @return true if Google Play Services is available and up to
+     * @return true if Google Play Services is a`vailable and up to
      * date on this device; false otherwise.
      */
     private boolean isGooglePlayServicesAvailable() {
