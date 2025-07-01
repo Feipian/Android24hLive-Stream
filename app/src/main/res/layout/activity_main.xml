@@ -5,7 +5,17 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    tools:context=".MainActivity">
+    tools:context=".MainActivity"
+    tools:ignore="ExtraText">
+
+    <TextView
+        android:id="@+id/tv_login_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Checking Google login status..."
+        android:textColor="@color/black"
+        android:textSize="16sp"
+        android:layout_margin="8dp"/>
 
     <Button
         android:id="@+id/btn_select_videos"
@@ -18,6 +28,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Start YouTube Stream" />
+
+    <Button
+        android:id="@+id/btn_select_existing_stream"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Select Existing Stream"/>
 
     <Button
         android:id="@+id/btn_call_youtube_api"
@@ -39,4 +55,10 @@
         android:layout_height="200dp"
         android:layout_marginTop="16dp"
         android:visibility="gone" />
+
+
+    <TextView
+        android:id="@+id/boardCastList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 </LinearLayout>
