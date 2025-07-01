@@ -3,7 +3,11 @@
 ## TODO:
 - [X] SELECT VIDEO PERMISSION
 - [ ] YOUTUBE LIVE STREAM
-  - [ ] Can Choice google account but cant access google cloud console service 
+  - [X] Can Choice google account but cant access google cloud console service 
+  - [X] Choice Exists BoardCast
+    - [ ] extract these metadata for continue BoardCast
+    - [ ] Optimize UI
+    - [ ] ffmpeg instead of google live stream api for save money
 - [X] How to show the video i choice??
 
 
