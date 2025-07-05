@@ -1,5 +1,11 @@
 # FOR 24H/7D LIVE STREAM AT YOUTUBE, CHOICE A VIDEO
 
+
+## Reference Article:
+
+https://github.com/pedroSG94/RootEncoder/blob/master/app/src/main/java/com/pedro/streamer/file/FromFileActivity.kt
+https://dev.to/theplebdev/using-android-to-stream-to-twitch-part-2-rtmp-handshake-2o44
+
 ## TODO:
 
         // 1. Initializing an RTMP streaming library.
