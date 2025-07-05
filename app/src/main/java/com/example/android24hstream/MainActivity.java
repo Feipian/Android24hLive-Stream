@@ -34,6 +34,7 @@ import android.media.MediaPlayer;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
@@ -86,7 +87,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import android.os.Handler;
 import android.os.Looper;
-
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "YouTubeApp"; // Use a consistent tag for logs
