@@ -23,6 +23,13 @@
         android:layout_height="wrap_content"
         android:text="Select Video" />
 
+
+
+    <Button
+        android:id="@+id/btn_select_existing_BoardCast"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Select Existing Stream" />
     <Button
         android:id="@+id/btn_start_stream"
         android:layout_width="wrap_content"
@@ -30,16 +37,20 @@
         android:text="Start YouTube Stream" />
 
     <Button
-        android:id="@+id/btn_select_existing_stream"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Select Existing Stream"/>
-
-    <Button
         android:id="@+id/btn_call_youtube_api"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Call YouTube Data API (Quickstart)" />
+
+    <com.pedro.library.view.OpenGlView
+        android:id="@+id/surfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="300dp" />
+    <SeekBar
+        android:id="@+id/seek_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp" />
 
     <TextView
         android:id="@+id/tv_output"

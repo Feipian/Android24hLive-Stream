@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:id="@+id/main"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <!-- Status Text -->
+    <TextView
+        android:id="@+id/tv_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Streaming Status: Ready"
+        android:textSize="18sp"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Stream Controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_status"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="16dp">
+
+        <Button
+            android:id="@+id/btn_select_video"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Select Video"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btn_start_stream"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Start Stream"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+
+    <!-- Stream Information -->
+    <TextView
+        android:id="@+id/tv_stream_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/btn_start_stream"
+        android:text="No video selected"
+        android:textSize="14sp"
+        android:layout_marginBottom="16dp"
+        tools:ignore="NotSibling" />
+
+    <!-- Log Output -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tv_stream_info">
+
+        <TextView
+            android:id="@+id/tv_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Log messages will appear here..."/>
+    </ScrollView>
+
+</RelativeLayout>

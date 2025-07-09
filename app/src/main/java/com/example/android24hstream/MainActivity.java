@@ -2,6 +2,27 @@ package com.example.android24hstream;
 
 import static com.google.android.gms.common.GooglePlayServicesUtilLight.isGooglePlayServicesAvailable;
 
+import static java.lang.Math.max;
+
+import static kotlinx.coroutines.CoroutineScopeKt.CoroutineScope;
+import static kotlinx.coroutines.DelayKt.delay;
+
+import com.arthenica.ffmpegkit.FFmpegKit;
+import com.arthenica.ffmpegkit.FFmpegSession;
+import com.arthenica.ffmpegkit.ReturnCode;
+import com.xuggle.xuggler.Configuration;
+import com.xuggle.xuggler.ICodec;
+import com.xuggle.xuggler.IContainer;
+import com.xuggle.xuggler.IContainerFormat;
+import com.xuggle.xuggler.IPacket;
+import com.xuggle.xuggler.IPixelFormat;
+import com.xuggle.xuggler.IRational;
+import com.xuggle.xuggler.IStream;
+import com.xuggle.xuggler.IStreamCoder;
+import com.xuggle.xuggler.IVideoPicture;
+import com.xuggle.xuggler.video.ConverterFactory;
+import com.xuggle.xuggler.video.IConverter;
+
 import android.Manifest;
 import android.accounts.AccountManager;
 import android.annotation.SuppressLint;
@@ -12,6 +33,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
@@ -23,7 +45,10 @@ import android.text.TextUtils;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.MediaController;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -34,7 +59,7 @@ import android.media.MediaPlayer;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.RequiresApi;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
@@ -42,12 +67,6 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 
 //import com.google.api.client.extensions.android.http.AndroidHttp;
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.javanet.NetHttpTransport; // Import this
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 import com.google.api.client.googleapis.extensions.android.gms.auth.GooglePlayServicesAvailabilityIOException;
@@ -73,21 +92,55 @@ import com.google.api.services.youtube.model.LiveBroadcastStatus;
 import com.google.api.services.youtube.model.LiveStream;
 import com.google.api.services.youtube.model.LiveStreamContentDetails;
 import com.google.api.services.youtube.model.LiveStreamSnippet;
+import com.google.api.services.youtube.model.Video;
+import com.pedro.common.ConnectChecker;
+import com.pedro.encoder.input.decoder.AudioDecoderInterface;
+import com.pedro.encoder.input.decoder.VideoDecoderInterface;
+import com.pedro.library.generic.GenericFromFile;
+import com.pedro.library.view.OpenGlView;
+
+
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import android.os.Handler;
 import android.os.Looper;
-public class MainActivity extends AppCompatActivity {
+import android.widget.SeekBar;
+
+
+
+
+public class MainActivity extends AppCompatActivity implements
+        ConnectChecker,
+        VideoDecoderInterface,
+        AudioDecoderInterface,
+        SeekBar.OnSeekBarChangeListener {
+
+    private GenericFromFile genericFromFile;
+    private ImageView bStream;
+    private ImageView bSelectFile;
+    private ImageView bReSync;
+    private ImageView bRecord;
+    private SeekBar seekBar;
+    private EditText etUrl;
+    private TextView tvFileName;
+    private OpenGlView openGlView;
+
+    private static YouTube youtube;
+    private Uri filePath = null;
+    private String recordPath = "";
+    private boolean touching = false;
+
+    private ActivityResultLauncher<String> activityResult;
 
     private static final String TAG = "YouTubeApp"; // Use a consistent tag for logs
 
@@ -124,8 +177,11 @@ public class MainActivity extends AppCompatActivity {
     // Account Picker and Authorization Launchers
     private ActivityResultLauncher<Intent> accountPickerLauncher;
     private ActivityResultLauncher<Intent> authorizationLauncher;
-    private String currentRtmpUrl;
-    private String currentStreamKey;
+    private static String currentRtmpUrl;
+    private static String currentStreamKey;
+    private static String  fullRtmpUrl;
+
+    boolean streamKeyRetrieved = false; // Flag to check if stream key was retrieved
 
     private static final String CLIENT_SECRETS= "client_secret.json";
     private static final Collection<String> SCOPES1 =
@@ -162,16 +218,34 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+//
+//        bStream = findViewById(R.id.b_start_stop);
+//        bSelectFile = findViewById(R.id.select_file);
+//        bReSync = findViewById(R.id.b_re_sync);
+//        bRecord = findViewById(R.id.b_record);
+//        etUrl = findViewById(R.id.et_rtp_url);
+//        tvFileName = findViewById(R.id.tv_file_name);
+//        openGlView = findViewById(R.id.surfaceView);
+//        GenericFromFile genericFromFile;
+
+
         setContentView(R.layout.activity_main); // Make sure you have this layout
 
+
+
+
         // Initialize the status TextView
+        seekBar = findViewById(R.id.seek_bar); // Initialize seekBar here after setContentView
         tvLoginStatus = findViewById(R.id.tv_login_status);
 
 
-        Button selectExistingStreamButton = findViewById(R.id.btn_select_existing_stream);
-        selectExistingStreamButton.setOnClickListener(v -> {
+        Button selectExistingStreamBoardCast = findViewById(R.id.btn_select_existing_BoardCast);
+        selectExistingStreamBoardCast.setOnClickListener(v -> {
             try {
-                selectExistingStream();
+                selectExistingBoardCast();
             } catch (IOException | GeneralSecurityException e) {
                 throw new RuntimeException(e);
             }
@@ -424,7 +498,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void selectExistingStream() throws IOException, GeneralSecurityException {
+    /**
+     * Fetches existing upcoming broadcasts and displays them in a dialog for selection.
+     * @throws IOException If there's an issue communicating with the YouTube API.
+     * @throws GeneralSecurityException If there's a security-related issue with the API call.
+     */
+    private void selectExistingBoardCast() throws IOException, GeneralSecurityException {
         Log.d("selectExistingStream", "selectExistingStream called");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         executor.execute(() -> {
@@ -458,6 +537,186 @@ public class MainActivity extends AppCompatActivity {
         });
 
     }
+    private void updateProgress() {
+        mainHandler.post(() -> {
+           Log.d("updateProgress", "updateProgress called") ;
+        });
+        int maxDuration = Math.max(
+                (int) genericFromFile.getVideoDuration(),
+                (int) genericFromFile.getAudioDuration()
+        );
+        mainHandler.post(() -> {
+            Log.d("updateProgress", "maxDuration: " + maxDuration);
+        });
+        if (seekBar != null) {
+            seekBar.setMax(maxDuration);
+        }
+
+        executorService.execute(() -> {
+            while (genericFromFile.isStreaming() || genericFromFile.isRecording()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    break;
+                }
+
+                if (!touching) {
+                    int progress = Math.max(
+                            (int) genericFromFile.getVideoTime(),
+                            (int) genericFromFile.getAudioTime()
+                    );
+
+                    mainHandler.post(() -> {
+                        if (seekBar != null) {
+                            seekBar.setProgress(progress);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+
+    private void delay(int i) {
+    }
+
+    private void transitionBroadcastToLive(String broadcastId) {
+        executorService.execute(() -> {
+            try {
+                Log.d(TAG, "Attempting to transition broadcast " + broadcastId + " to live");
+
+                YouTube.LiveBroadcasts.Transition transitionRequest = youtubeService.liveBroadcasts()
+                        .transition("live", broadcastId, "status");
+
+                LiveBroadcast transitionedBroadcast = transitionRequest.execute();
+
+                mainHandler.post(() -> {
+                    String newStatus = transitionedBroadcast.getStatus().getLifeCycleStatus();
+                    Toast.makeText(MainActivity.this,
+                            "Broadcast is now: " + newStatus, Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "Transition successful. New status: " + newStatus);
+                });
+
+            } catch (GooglePlayServicesAvailabilityIOException e) {
+                Log.e(TAG, "Google Play Services error", e);
+                mainHandler.post(() -> showGooglePlayServicesAvailabilityErrorDialog(e.getConnectionStatusCode()));
+            } catch (UserRecoverableAuthIOException e) {
+                Log.e(TAG, "Auth error", e);
+                mainHandler.post(() -> authorizationLauncher.launch(e.getIntent()));
+            } catch (IOException e) {
+                Log.e(TAG, "Network error", e);
+                mainHandler.post(() -> Toast.makeText(MainActivity.this,
+                        "Transition failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error", e);
+                mainHandler.post(() -> Toast.makeText(MainActivity.this,
+                        "Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private String getPathFromUri(Uri uri) {
+        String[] projection = { MediaStore.Video.Media.DATA };
+        Cursor cursor = getContentResolver().query(uri, projection, null, null, null);
+        if (cursor != null) {
+            int column_index = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA);
+            cursor.moveToFirst();
+            String path = cursor.getString(column_index);
+            cursor.close();
+            return path;
+        }
+        return uri.getPath(); // fallback
+    }
+
+//    private static ArrayList<IPacket> callMyDataPacket(String url, String fileName){
+//        // TODO Auto-generated method stub
+//        ArrayList<IPacket> arrayList = new ArrayList<IPacket>();
+//        IContainer container = IContainer.make();
+//        IContainerFormat containerFormat_live = IContainerFormat.make();
+//        containerFormat_live.setOutputFormat("flv", url + "/" + fileName, null);
+//        container.setInputBufferLength(0);
+//        int retVal = container.open(url + "/" + fileName, IContainer.Type.WRITE, containerFormat_live);
+//        if (retVal < 0) {
+//            System.err.println("Could not open output container for live stream");
+//            System.exit(1);
+//        }
+//        IStream stream1 = container.addNewStream(0);
+//        IStreamCoder coder = stream1.getStreamCoder();
+//        ICodec codec = ICodec.findEncodingCodec(ICodec.ID.CODEC_ID_H264);
+//        coder.setNumPicturesInGroupOfPictures(5);
+//        coder.setCodec(codec);
+//        coder.setBitRate(200000);
+//        coder.setPixelType(IPixelFormat.Type.YUV420P);
+//        coder.setHeight(480);
+//        coder.setWidth(640);
+//        System.out.println("[ENCODER] video size is " + 640 + "x" + 480);
+//        coder.setFlag(IStreamCoder.Flags.FLAG_QSCALE, true);
+//        coder.setGlobalQuality(0);
+//        IRational frameRate = IRational.make(24, 1);
+//        coder.setFrameRate(frameRate);
+//        coder.setTimeBase(IRational.make(frameRate.getDenominator(), frameRate.getNumerator()));
+//        Properties props = new Properties();
+////        props.setProperty("x264opts", "bitrate=10500:qpmin=7:min-keyint=5:keyint=15:cabac=1:pass=1:stats=/home/surfdogisHappyDog/Downloads/my888file.stats:no-mbtree=1");
+////        props.setProperty("tune", "film");
+////        props.setProperty("preset", "slow");
+//        InputStream is = MainActivity.class.getClass().getResourceAsStream("/resources/libx264-normal.ffpreset");
+//        try {
+//            props.load(is);
+//        } catch (IOException e) {
+//            System.err.println("You need the libx264-normal.ffpreset file from the Xuggle distribution in your classpath.");
+//            System.exit(1);
+//        }
+//        Configuration.configure(props, coder);
+//        coder.open();
+//        int retvall = container.writeHeader();
+//        if (retvall < 0)
+//            throw new RuntimeException("Could not write header for: .................." );
+//        long firstTimeStamp = System.currentTimeMillis();
+//        long lastTimeStamp = -1;
+//        int i = 0;
+//        java.awt.Robot robot = new java.awt.Robot();
+//        while (i < 60) {
+//            //long iterationStartTime = System.currentTimeMillis();
+//            long now = System.currentTimeMillis();
+//            //grab the screenshot
+//            java.awt.image.BufferedImage image = robot.createScreenCapture(new java.awt.Rectangle(0, 0, 640, 480));
+//            //convert it for Xuggler
+//            java.awt.image.BufferedImage currentScreenshot = new java.awt.image.BufferedImage(image.getWidth(), image.getHeight(), java.awt.image.BufferedImage.TYPE_3BYTE_BGR);
+//            currentScreenshot.getGraphics().drawImage(image, 0, 0, null);
+//            //start the encoding process
+//            IPacket packet = IPacket.make();
+//            IConverter converter = ConverterFactory.createConverter(currentScreenshot, IPixelFormat.Type.YUV420P);
+//            long timeStamp = (now - firstTimeStamp) * 1000;
+//            IVideoPicture outFrame = converter.toPicture(currentScreenshot, timeStamp);
+//            if (i == 0) {
+//                //make first frame keyframe
+//                outFrame.setKeyFrame(true);
+//            }
+//            outFrame.setQuality(0);
+//            coder.encodeVideo(packet, outFrame, 0);
+//            outFrame.delete();
+//            if (packet.isComplete()) {
+//                packet.setStreamIndex(0);
+//                container.writePacket(packet);
+//                System.out.println("[ENCODER Packet Completed] writing packet of size " + packet.getSize() + " for elapsed time " + ((timeStamp - lastTimeStamp) / 1000));
+//                lastTimeStamp = timeStamp;
+//                arrayList.add(packet);
+//            }
+//            System.out.println("[ENCODER] encoded image " + i + " in " + (System.currentTimeMillis() - now));
+//            i++;
+//            try {
+//                Thread.sleep(Math.max((long) (1000 / frameRate.getDouble()) - (System.currentTimeMillis() - now), 0));
+////        	Thread.sleep(500);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//        int retval = container.writeTrailer();
+//        if (retval < 0)
+//            throw new RuntimeException("Could not write trailer to output file");
+//        return arrayList;
+//    }
 
     private void onBroadcastSelected(YouTubeBroadcast broadcast) {
         Log.d("SelectedBroadcast", "ID: " + broadcast.getId() + ", Title: " + broadcast.getTitle());
@@ -473,10 +732,10 @@ public class MainActivity extends AppCompatActivity {
 
         // Create a new stream and bind it to the selected broadcast
         final String selectedBroadcastId = broadcast.getId();
+        // Removed: String currentRtmpUrl = null; and String currentStreamKey = null; as they are now static members
         executorService.execute(() -> {
-            String currentRtmpUrl = null;
-            String currentStreamKey = null;
             Exception currentAsyncError = null;
+
 
             mainHandler.post(() -> {
                 mProgress.setMessage("Creating and binding live stream to: " + broadcast.getTitle());
@@ -484,50 +743,417 @@ public class MainActivity extends AppCompatActivity {
             });
 
             try {
-                // Define the LiveStream object, which will be uploaded as the request body.
-                LiveStream liveStream = new LiveStream();
+//                // Define the LiveStream object, which will be uploaded as the request body.
+//                LiveStream liveStream = new LiveStream();
 
-                // Add the cdn object property to the LiveStream object.
-                CdnSettings cdn = new CdnSettings();
-                cdn.setFrameRate("60fps");
-                cdn.setIngestionType("rtmp");
-                cdn.setResolution("1080p");
-                liveStream.setCdn(cdn);
+//                // Add the cdn object property to the LiveStream object.
+//                CdnSettings cdn = new CdnSettings();
+//                cdn.setFrameRate("60fps");
+//                cdn.setIngestionType("rtmp");
+//                cdn.setResolution("1080p");
+//                liveStream.setCdn(cdn);
 
-                // Add the contentDetails object property to the LiveStream object.
-                LiveStreamContentDetails contentDetails = new LiveStreamContentDetails();
-                contentDetails.setIsReusable(true);
-                liveStream.setContentDetails(contentDetails);
+//                // Add the contentDetails object property to the LiveStream object.
+//                LiveStreamContentDetails contentDetails = new LiveStreamContentDetails();
+//                contentDetails.setIsReusable(true);
+//                liveStream.setContentDetails(contentDetails);
 
-                // Add the snippet object property to the LiveStream object.
-                LiveStreamSnippet snippet = new LiveStreamSnippet();
-                snippet.setDescription("A description of your video stream. This field is optional.");
-                snippet.setTitle("Your new video stream's name");
-                liveStream.setSnippet(snippet);
+//                // Add the snippet object property to the LiveStream object.
+//                LiveStreamSnippet snippet = new LiveStreamSnippet();
+//                snippet.setDescription("A description of your video stream. This field is optional.");
+//                snippet.setTitle("Your new video stream's name");
+//                liveStream.setSnippet(snippet);
 
-                // Define and execute the API request
-                YouTube.LiveStreams.Insert request = youtubeService.liveStreams()
-                        .insert("snippet,cdn,contentDetails,status", liveStream);
-                LiveStream response = request.setKey(BuildConfig.API_KEY).execute();
-                System.out.println(response);
+//                // Define and execute the API request
+//                YouTube.LiveStreams.Insert request = youtubeService.liveStreams()
+//                        .insert("snippet,cdn,contentDetails,status", liveStream);
+//                LiveStream returnStream = request.setKey(BuildConfig.API_KEY).execute();
+//                System.out.println(returnStream);
 
 
-                // --- NEW CODE: Extract RTMP URL and Stream Key ---
-                if (response != null && response.getCdn() != null && response.getCdn().getIngestionInfo() != null) {
-                    currentRtmpUrl = response.getCdn().getIngestionInfo().getIngestionAddress();
-                    currentStreamKey = response.getCdn().getIngestionInfo().getStreamName();
-                    Log.d(TAG, "Successfully created stream. RTMP URL: " + currentRtmpUrl + ", Stream Key: " + currentStreamKey);
-                } else {
-                    Log.e(TAG, "Stream created but could not retrieve RTMP details from response.");
-                    // You might want to throw an exception or set an error flag here
+//                // --- NEW CODE: Extract RTMP URL and Stream Key ---
+//                if (returnStream != null && returnStream.getCdn() != null && returnStream.getCdn().getIngestionInfo() != null) {
+//                    currentRtmpUrl = returnStream.getCdn().getIngestionInfo().getIngestionAddress();
+//                    currentStreamKey = returnStream.getCdn().getIngestionInfo().getStreamName(); // Save the stream key
+//                    streamKeyRetrieved = true; // This flag confirms we got the key
+//                    // set up the stream URL with the key
+//                    fullRtmpUrl = currentRtmpUrl + "/" + currentStreamKey;
+//                    mainHandler.post(() -> {
+//                        Log.d(TAG, "Successfully created stream. RTMP URL: " + currentRtmpUrl + ", Stream Key: " + currentStreamKey);
+//                        System.out.println("Successfully created stream. RTMP URL: " + currentRtmpUrl + ", Stream Key: " + currentStreamKey);
+//                    });
+
+                // When selecting an existing broadcast, we don't insert a new one.
+                // We use the 'broadcast' object passed to this method (which is the selected one).
+                // So, the insert operation below is not needed here.
+                // YouTube.LiveBroadcasts.Insert liveBroadcastInsert =
+                //         youtubeService.liveBroadcasts().insert("snippet,status", broadcast); // Use youtubeService
+//                LiveBroadcast returnedBroadcast = broadcast; // The selected broadcast IS the returnedBroadcast for this context
+                YouTube.LiveBroadcasts.List request = youtubeService.liveBroadcasts()
+                        .list("id,snippet,contentDetails,status"); // Request 'id' as well
+                LiveBroadcastListResponse response = request.setId(broadcast.getId()).execute();
+
+//                // --- Set Scheduled Start and End Times ---
+//                LiveBroadcast broadcastToUpdate = response.getItems().get(0); // Get the broadcast to update
+//                LiveBroadcastSnippet snippet = broadcastToUpdate.getSnippet();
+//                // Set scheduled start time to 1 minute from now
+//                snippet.setScheduledStartTime(new DateTime(System.currentTimeMillis() + 60 * 1000));
+//                // Set scheduled end time to 1 hour after the new start time
+//                snippet.setScheduledEndTime(new DateTime(System.currentTimeMillis() + 60 * 1000 + 60 * 60 * 1000));
+//                broadcastToUpdate.setSnippet(snippet);
+//
+//                // Update the broadcast with the new times
+//                YouTube.LiveBroadcasts.Update updateRequest = youtubeService.liveBroadcasts().update("snippet", broadcastToUpdate);
+//                LiveBroadcast updatedBroadcast = updateRequest.execute();
+
+
+
+                // Print information from the API response, including the title and description.
+                if (response != null && response.getItems() != null && !response.getItems().isEmpty()) {
+                    LiveBroadcast returnedBroadcastItem = response.getItems().get(0); // Get the first item
+                    System.out.println("\n================== Returned Broadcast ==================\n");
+                    System.out.println("  - Id: " + returnedBroadcastItem.getId()); // Use returnedBroadcastItem
+                    System.out.println("  - Title: " + returnedBroadcastItem.getSnippet().getTitle());
+                    System.out.println("  - Description: " + returnedBroadcastItem.getSnippet().getDescription());
+                    System.out.println("  - Published At: " + returnedBroadcastItem.getSnippet().getPublishedAt());
+                    System.out.println(
+                            "  - Scheduled Start Time: " + returnedBroadcastItem.getSnippet().getScheduledStartTime());
+                    System.out.println(
+                            "  - Scheduled End Time: " + returnedBroadcastItem.getSnippet().getScheduledEndTime());
+                    // You can also display these on the UI if needed:
+                    // mainHandler.post(() -> {
+                    //     mOutputText.append("\nSelected Broadcast Title: " + returnedBroadcastItem.getSnippet().getTitle());
+                    //     mOutputText.append("\nSelected Broadcast Description: " + returnedBroadcastItem.getSnippet().getDescription());
+                    // });
                 }
 
-                YouTube.LiveBroadcasts.Bind bindRequest = youtubeService.liveBroadcasts()
-                        .bind(selectedBroadcastId, "id,contentDetails"); // Use the ID of the selected broadcast
-                assert response != null;
-                bindRequest.setStreamId(response.getId()); // Use the ID of the newly created stream
-                LiveBroadcast boundBroadcast = bindRequest.execute();
-                Log.d(TAG, "Existing broadcast " + boundBroadcast.getId() + " bound to new stream: " + response.getId());
+
+
+                // Create a snippet with the video stream's title.
+                LiveStreamSnippet streamSnippet = new LiveStreamSnippet();
+                streamSnippet.setTitle("I will become a successful Youtuber!!");
+
+                // Define the content distribution network settings for the
+                // video stream. The settings specify the stream's format and
+                // ingestion type. See:
+                // https://developers.google.com/youtube/v3/live/docs/liveStreams#cdn
+                CdnSettings cdnSettings =  new CdnSettings();
+                cdnSettings.setFormat("240p");
+                cdnSettings.setFrameRate("60fps");
+                cdnSettings.setResolution("1080p");
+                cdnSettings.setIngestionType("rtmp");
+
+
+                // continue passing video to this stream
+                if (selectedVideoUri != null) {
+                        String videoPath = getPathFromUri(selectedVideoUri);
+                        if (videoPath != null) {
+                            Video video = new Video();
+                            video.set("video", videoPath);
+
+                            LiveStream stream = new LiveStream();
+                            stream.set("video", video);
+                            stream.setKind("youtube#liveStream");
+                            stream.setSnippet(streamSnippet);
+                            stream.setCdn(cdnSettings);
+
+                            // Construct and execute the API request to insert the stream.
+                            YouTube.LiveStreams.Insert liveStreamInsert =
+                                    youtubeService.liveStreams().insert("snippet,cdn", stream);
+                            liveStreamInsert.set("video", videoPath);
+                            LiveStream returnedStream = liveStreamInsert.execute();
+                            returnedStream.set("video", videoPath);
+
+                            // Print information from the API response.
+                            System.out.println("\n================== Returned Stream ==================\n");
+                            System.out.println("  - Id: " + returnedStream.getId());
+                            System.out.println("  - Title: " + returnedStream.getSnippet().getTitle());
+                            System.out.println("  - Description: " + returnedStream.getSnippet().getDescription());
+                            System.out.println("  - Published At: " + returnedStream.getSnippet().getPublishedAt());
+                            System.out.println("  - Ingestion Address: " + returnedStream.getCdn().getIngestionInfo().getIngestionAddress());
+
+
+                            // Construct and execute a request to bind the new broadcast
+                            // and stream.
+
+                            YouTube.LiveBroadcasts.Bind liveBroadcastBind = youtubeService.liveBroadcasts()
+                                .bind(broadcast.getId(), "id,contentDetails"); // Use the ID of the selected broadcast
+
+                            liveBroadcastBind.setStreamId(returnedStream.getId()); // Set the stream ID to bind
+
+                            LiveBroadcast boundBroadcast = liveBroadcastBind.execute();
+
+
+                            // Print information from the API response.
+                            System.out.println("\n================== Returned Bound Broadcast ==================\n");
+                            System.out.println("  - Broadcast Id: " + boundBroadcast.getId());
+                            System.out.println(
+                                    "  - Bound Stream Id: " + boundBroadcast.getContentDetails().getBoundStreamId());
+
+
+                            String url = returnedStream.getCdn().getIngestionInfo().getIngestionAddress();
+                            String fileName = returnedStream.getCdn().getIngestionInfo().getStreamName();
+
+                            // --- Start FFmpeg Streaming ---
+                            final String rtmpOutputUrl = url + "/" + fileName;
+                            final String inputVideoPath = getPathFromUri(selectedVideoUri);
+
+                            if (inputVideoPath == null) {
+                                Log.e(TAG, "Cannot start FFmpeg: Input video path is null.");
+                                mainHandler.post(() -> Toast.makeText(MainActivity.this, "Error: Could not get video file path for FFmpeg.", Toast.LENGTH_LONG).show());
+                                return; // Exit if path is null
+                            }
+
+                            Log.d(TAG, "Starting FFmpeg stream. Input: " + inputVideoPath + ", Output: " + rtmpOutputUrl);
+                            mainHandler.post(() -> mOutputText.append("\nStarting FFmpeg stream to: " + rtmpOutputUrl));
+
+                            // Ensure FFmpeg execution is on a background thread
+                            executorService.execute(() -> {
+                                Process process = null;
+                                try {
+                                    // Loop the video indefinitely
+                                    // Basic FFmpeg command (adjust as needed for your video)
+                                    // -re: read input at native frame rate (important for streaming)
+                                    // -i: input file
+                                    // -c:v copy -c:a copy: if the video is already H.264/AAC, this avoids re-encoding (faster, less CPU)
+                                    // -f flv: output format for RTMP
+
+                                    // FFmpegKit example:
+                                    // FFmpegSession session = FFmpegKit.execute("-i " + inputVideoPath + " -c:v mpeg4 " + rtmpOutputUrl);
+                                    // if (ReturnCode.isSuccess(session.getReturnCode())) {
+                                    //     // SUCCESS
+                                    // } else if (ReturnCode.isCancel(session.getReturnCode())) {
+                                    //     // CANCEL
+                                    // } else {
+                                    //     // FAILURE
+                                    //     Log.d(TAG, String.format("Command failed with state %s and rc %s.%s", session.getState(), session.getReturnCode(), session.getFailStackTrace()));
+                                    // }
+
+                                    // -f flv: output format for RTMP
+                                    // String[] cmd = {"ffmpeg", "-re", "-i", inputVideoPath, "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", "-f", "flv", rtmpOutputUrl};
+                                    // String ffmpegPath = getApplicationInfo().nativeLibraryDir + java.io.File.separator + "libffmpeg.so";
+                                    // More robust command for potentially incompatible videos:
+                                    String command = String.format("-stream_loop -1 -re -i \"%s\" -pix_fmt yuvj420p -g 48 -keyint_min 48 -sc_threshold 0 -b:v 4500k -b:a 128k -ar 44100 -acodec aac -vcodec h264_mediacodec -preset medium -crf 28 -threads 4 -f flv \"%s\" ", inputVideoPath, rtmpOutputUrl);
+
+
+                                    // Execute FFmpeg command using FFmpegKit
+                                    FFmpegSession session = FFmpegKit.executeAsync(command, session1 -> {
+                                        if (ReturnCode.isSuccess(session1.getReturnCode())) {
+                                            Log.d(TAG, "FFmpeg command executed successfully.");
+                                            // Transition broadcast to live after FFmpeg starts successfully
+                                            transitionBroadcastToLive(broadcast.getId());
+                                        } else {
+                                            Log.e(TAG, String.format("FFmpeg command failed with state %s and rc %s.%s", session1.getState(), session1.getReturnCode(), session1.getFailStackTrace()));
+                                        }
+                                    }, log -> Log.d(TAG, "FFmpeg log: " + log.getMessage()), output -> Log.d(TAG, "FFmpeg output: " + output.toString()));
+                                    mainHandler.post(() -> {
+                                        mOutputText.append("\nFFmpeg stream started (looping).");
+                                        Log.d(TAG, "FFmpeg stream started (looping). Attempting to transition broadcast to live.");
+                                    });
+
+                                    // If you need to handle the process exit (e.g., if it crashes),
+                                    // you can still use process.waitFor() but be aware it will block.
+                                    // int exitCode = process.waitFor(); // This would block until ffmpeg exits
+
+                                } catch (Exception e) { // Catch broader exceptions if FFmpegKit throws them
+                                    // FFmpegKit's executeAsync handles process destruction internally on failure/cancel.
+                                    // You might not need to manually destroy 'process' if using FFmpegKit.
+                                    Log.e(TAG, "FFmpeg streaming error", e);
+                                    mainHandler.post(() -> mOutputText.append("\nFFmpeg streaming error: " + e.getMessage()));
+                                }
+                            });
+                            // --- End FFmpeg Streaming ---
+
+
+
+                            // IMPORTANT: The "video" field for LiveStreams.insert is NOT for uploading the video file directly.
+                            // It's a metadata field. YouTube API does not support direct video file upload via this method for live streaming.
+                            // You stream the video content via RTMP.
+                            // The line below is likely a misunderstanding of the API.
+                            // video.set("video", videoPath); // This is incorrect for LiveStreams.insert
+
+                            // You've already created 'returnStream'. You don't need to insert another one here
+                            // unless you intend to create a completely separate stream object, which seems unlikely.
+
+                            // If you are trying to associate the video file path with the stream for your own tracking,
+                            // you could potentially use a custom property if the API supported it, or store it locally.
+                            // However, the YouTube API itself doesn't use this "video" field in LiveStream for the video content.
+
+                            // The following block for inserting another stream seems redundant and potentially incorrect
+                            // based on the context of binding an existing broadcast to a new stream.
+                            // LiveStream stream = new LiveStream();
+                            // stream.set("video", video); // Incorrect usage
+                            // stream.setKind("youtube#liveStream");
+                            // stream.setSnippet(snippet); // Reusing snippet from earlier, which is fine
+                            // stream.setCdn(cdn); // Reusing cdn from earlier
+                            //
+                            // YouTube.LiveStreams.Insert liveStreamInsert =
+                            //         youtubeService.liveStreams().insert("snippet,cdn", stream); // Using youtubeService
+                            // LiveStream newInsertedStream = liveStreamInsert.execute(); // This would create another new stream
+                            // System.out.println("\n================== Newly Inserted Stream (Potentially Redundant) ==================\n");
+                            // System.out.println("  - Id: " + newInsertedStream.getId());
+                        } else {
+                            Log.e(TAG, "Could not get path from selected video URI.");
+                        }
+                    } else {
+                        Log.w(TAG, "No video selected to associate with the stream metadata (if that was the intent).");
+                    }
+
+
+//                    if (genericFromFile.isStreaming()) {
+//                        genericFromFile.stopStream();
+//                        bStream.setImageResource(R.drawable.stream_icon);
+////                        if (!genericFromFile.isRecording()) ScreenOrientation.unlockScreen(this)
+//                    } else if (genericFromFile.isRecording()) {
+//                        if (!genericFromFile.isAudioDeviceEnabled()) genericFromFile.playAudioDevice();
+//                        genericFromFile.startStream(fullRtmpUrl);
+//                        bStream.setImageResource(R.drawable.stream_stop_icon);
+////                        ScreenOrientation.lockScreen(this)
+//                        updateProgress();
+//                    } else {
+//                        Toast.makeText(getApplicationContext(), "Error preparing stream, This device can't do it", Toast.LENGTH_SHORT).show();
+//                    }
+
+
+                } catch (IOException e) {
+                throw new RuntimeException(e);
+
+//              Bind the stream to the boardcast
+//                YouTube.LiveBroadcasts.Bind liveBroadcastBind = youtubeService.liveBroadcasts()
+//                        .bind(broadcast.getId(), "id,contentDetails"); // Use the ID of the selected broadcast
+
+//                liveBroadcastBind.setStreamId(returnStream.getId());
+//
+//                LiveBroadcast returnedBroadcast = liveBroadcastBind.execute();
+
+//                YouTube.LiveBroadcasts.List requestLiveBroadcasts = youtubeService.liveBroadcasts()
+//                        .list("snippet,contentDetails,status");
+//                LiveBroadcastListResponse response = requestLiveBroadcasts.setId(broadcast.getId()).execute();
+//                System.out.println(response);
+
+
+                // send video to stream
+
+                // Insert video to stream
+
+//
+//                YouTube.LiveBroadcasts.Transition tansationrequest = youtubeService.liveBroadcasts()
+//                        .transition("live", broadcast.getId(), "status");
+
+//                System.out.println(tansationrequest);
+
+
+//                LiveBroadcastListResponse response1 = requestLiveBroadcasts.setId(broadcast.getId()).execute();
+//                System.out.println(response1);
+
+//                // Check if the broadcast status is "noData" and if a video is selected
+//                if (response != null && !response.getItems().isEmpty()) {
+//                    LiveBroadcast currentBroadcast = response.getItems().get(0);
+//                    if (currentBroadcast.getStatus() != null && "noData".equals(currentBroadcast.getStatus().getLifeCycleStatus()) && selectedVideoUri != null && streamKeyRetrieved) {
+//                        mainHandler.post(() -> {
+//                            Toast.makeText(MainActivity.this, "Broadcast has no data. Attempting to stream selected video.", Toast.LENGTH_LONG).show();
+//                            // Ensure you have the fullRtmpUrl (rtmpUrl + "/" + streamKey)
+//                            // and the broadcast ID (broadcast.getId())
+//                            startRtmpStreaming(currentRtmpUrl, currentStreamKey, broadcast.getId(), selectedVideoUri);
+//                        });
+//                    }
+//                }
+
+
+//                assert response != null;
+//                bindRequest.setStreamId(response.getId()); // Use the ID of the newly created stream
+//                LiveBroadcast boundBroadcast = bindRequest.execute();
+                // After binding, update UI to show success
+
+//                mainHandler.post(() -> {
+//                    if (boundBroadcast != null && boundBroadcast.getId() != null) {
+//                        Log.d(TAG, "Successfully bound broadcast " + boundBroadcast.getId() + " to stream " + response.getId());
+//                        Toast.makeText(MainActivity.this, "Broadcast '" + broadcast.getTitle() + "' successfully bound to new stream!", Toast.LENGTH_LONG).show();
+//                        mOutputText.append("\nBroadcast '" + broadcast.getTitle() + "' bound to stream: " + response.getId());
+//                    } else {
+//                        Log.e(TAG, "Failed to bind broadcast to stream. BoundBroadcast object is null or has no ID.");
+//                        Toast.makeText(MainActivity.this, "Error: Could not confirm broadcast binding.", Toast.LENGTH_LONG).show();
+//                    }
+//                });
+
+                // After successful binding, check the broadcast status
+//                mainHandler.post(() -> {
+//                    // You can call a method here to fetch and display the broadcast status
+//                    // For example:
+//                    // checkBroadcastStatus(selectedBroadcastId);
+//                    // Or directly use the status if available from 'boundBroadcast', after null check
+//                    if (boundBroadcast != null && boundBroadcast.getStatus() != null && boundBroadcast.getStatus().getLifeCycleStatus() != null) {
+//                        Log.d("BroadcastStatus", "Status: " + boundBroadcast.getStatus().getLifeCycleStatus());
+//                        Toast.makeText(MainActivity.this, "Broadcast status: " + boundBroadcast.getStatus().getLifeCycleStatus(), Toast.LENGTH_LONG).show();
+//                    } else {
+//                        Log.e("BroadcastStatus", "Could not get broadcast status. Broadcast or status is null.");
+//                        Toast.makeText(MainActivity.this, "Could not retrieve broadcast status.", Toast.LENGTH_LONG).show();
+//                    }
+//                });
+
+
+
+//                // Initialize the streamer if not already done
+//                mainHandler.post(() -> {
+//                    Log.d(TAG, "Initializing GenericFromFile");
+//                    System.out.println("Initializing GenericFromFile");
+//                });
+//
+//                if (genericFromFile == null) {
+//                    OpenGlView openGlView = findViewById(R.id.surfaceView); // Make sure you have this in your layout
+//                    genericFromFile = new GenericFromFile(openGlView, this, this, this);
+//                }
+//
+//                try {
+//                    // Prepare the video file
+//                    mainHandler.post(() -> {
+//                        Log.d(TAG, "Preparing video from URI: " + selectedVideoUri);
+//                        System.out.println("Preparing video from URI: " + selectedVideoUri);
+//                    });
+//                    String videoPath = getPathFromUri(selectedVideoUri);
+//                    if (videoPath != null) {
+//                        mainHandler.post(() -> {
+//
+//                            Log.d(TAG, "Video path resolved: " + videoPath);
+//                            System.out.println("Video path resolved: " + videoPath);
+//                        });
+//                        genericFromFile.prepareVideo(videoPath, 1920, 1080, 30, 3000 * 1024);
+//                        mainHandler.post(() -> {
+//                            Log.d(TAG, "Video prepared successfully");
+//                        });
+//
+//                        // Start streaming
+//                        if (!genericFromFile.isStreaming()) {
+//                            genericFromFile.startStream(fullRtmpUrl);
+//                            mainHandler.post(() -> {
+//                                Log.d(TAG, "Starting stream to: " + fullRtmpUrl);
+//                            });
+//
+//                            mainHandler.post(() -> {
+//                                Toast.makeText(this, "Streaming started!", Toast.LENGTH_SHORT).show();
+//                            });
+//                            // Transition broadcast to "live" state
+//                            transitionBroadcastState(broadcast.getId(), "live");
+//
+//                            // Start progress updater
+//                            updateProgress();
+//                            // In your streaming code after starting the stream:
+//                            if (genericFromFile.isStreaming()) {
+//                                transitionBroadcastToLive(broadcast.getId());
+//                            }
+//                        }
+//                    } else {
+//                        Toast.makeText(this, "Could not get video file path", Toast.LENGTH_SHORT).show();
+//                    }
+//                } catch (Exception e) {
+//                    mainHandler.post(() -> {
+//                        Log.e(TAG, "Error starting stream", e);
+//                    });
+//                    Toast.makeText(this, "Error starting stream: " + e.getMessage(), Toast.LENGTH_LONG).show();
+//                }
+
+//
+
 
 
 //                // --- 3. Bind Live Broadcast to Live Stream ---
@@ -537,42 +1163,40 @@ public class MainActivity extends AppCompatActivity {
 //                LiveBroadcast boundBroadcast = bindRequest.execute();
 //                Log.d(TAG, "Existing broadcast " + boundBroadcast.getId() + " bound to new stream: " + createdStream.getId());
 
-            } catch (GooglePlayServicesAvailabilityIOException e) {
-                currentAsyncError = e;
-                mainHandler.post(() -> showGooglePlayServicesAvailabilityErrorDialog(e.getConnectionStatusCode()));
-            } catch (UserRecoverableAuthIOException e) {
-                currentAsyncError = e;
-                mainHandler.post(() -> authorizationLauncher.launch(e.getIntent()));
-            } catch (IOException e) {
-                currentAsyncError = e;
-                Log.e(TAG, "IOException during stream creation/binding for existing broadcast", e);
             } catch (Exception e) {
                 currentAsyncError = e;
                 Log.e(TAG, "Unexpected exception during stream creation/binding for existing broadcast", e);
             } finally {
-                final String finalRtmpUrl = currentRtmpUrl;
-                final String finalStreamKey = currentStreamKey;
-                final Exception finalError = currentAsyncError;
+                final String capturedRtmpUrl = currentRtmpUrl; // Capture current state for the lambda
+                final String capturedStreamKey = currentStreamKey; // Capture current state for the lambda
+                final Exception capturedError = currentAsyncError; // Capture current state for the lambda
+                final boolean finalStreamKeyRetrieved = streamKeyRetrieved;
                 final Uri finalSelectedVideoUri = selectedVideoUri;
 
                 mainHandler.post(() -> {
                     mProgress.dismiss();
-                    if (finalError != null) {
-                        if (!(finalError instanceof UserRecoverableAuthIOException)) {
-                            mOutputText.setText("Error setting up stream for selected broadcast: " + finalError.getMessage());
-                            Log.e(TAG, "Error setting up stream for selected broadcast", finalError);
-                        }
-                    } else if (finalRtmpUrl != null && finalStreamKey != null && finalSelectedVideoUri != null) {
-                        mOutputText.setText("Stream ready for broadcast '" + broadcast.getTitle() + "'. RTMP: " + finalRtmpUrl + "/" + finalStreamKey);
-                        startRtmpStreaming(finalRtmpUrl, finalStreamKey, selectedBroadcastId, finalSelectedVideoUri);
+                    if (capturedError != null) { // Use capturedError instead of finalError
+
+                        mOutputText.setText("Error setting up stream for selected broadcast: " + capturedError.getMessage());
+                        Log.e(TAG, "Error setting up stream for selected broadcast", capturedError);
+
+                    } else if (capturedRtmpUrl != null && capturedStreamKey != null && finalSelectedVideoUri != null && finalStreamKeyRetrieved) {
+                        // Update the UI and also store the stream key and RTMP URL globally if needed for other activities
+                        // currentRtmpUrl and currentStreamKey are already static and updated
+                        mOutputText.setText("Stream ready for broadcast '" + broadcast.getTitle() +
+                                            "'. RTMP: " + capturedRtmpUrl + "/" + capturedStreamKey +
+                                            "\nStream Key (for StreamActivity): " + capturedStreamKey);
+                        // startRtmpStreaming is now implicitly handled by the FFmpeg command within the try block
                     } else {
-                        mOutputText.setText("Failed to get RTMP details for selected broadcast.");
+                        mOutputText.setText("Failed to get RTMP details or video not selected for broadcast '" + broadcast.getTitle() + "'.");
                         Log.e(TAG, "Failed to get RTMP details for selected broadcast.");
                     }
                 });
             }
         });
     }
+
+
     private void showBroadcastSelectionDialog(List<YouTubeBroadcast> broadcasts) {
         if (broadcasts.isEmpty()) {
             Toast.makeText(this, "No broadcasts found", Toast.LENGTH_SHORT).show();
@@ -798,9 +1422,8 @@ public class MainActivity extends AppCompatActivity {
 
         executorService.execute(() -> {
             Exception currentAsyncError = null;
-            String currentRtmpUrl = null;
-            String currentStreamKey = null;
-            String currentBroadcastId = null;
+            // Removed: String currentRtmpUrl = null; and String currentStreamKey = null; as they are now static members
+            String currentBroadcastId = null; // Local variable for this specific broadcast
             String resultString = null;
 
             mainHandler.post(() -> {
@@ -858,7 +1481,10 @@ public class MainActivity extends AppCompatActivity {
                 // Get Ingestion Info (RTMP URL and Stream Key)
                 currentRtmpUrl = createdStream.getCdn().getIngestionInfo().getIngestionAddress(); // Corrected this previously
                 currentStreamKey = createdStream.getCdn().getIngestionInfo().getStreamName();   // Corrected this previously
-                Log.d(TAG, "RTMP URL: " + currentRtmpUrl + "/" + currentStreamKey);
+                fullRtmpUrl = currentRtmpUrl + "/" + currentStreamKey;
+                Log.d(TAG, "Full RTMP URL: " + fullRtmpUrl);
+                // Now you can pass fullRtmpUrl to another function
+
 
                 // --- 3. Bind Live Broadcast to Live Stream ---
                 YouTube.LiveBroadcasts.Bind bindRequest = youtubeService.liveBroadcasts()
@@ -884,8 +1510,8 @@ public class MainActivity extends AppCompatActivity {
             } finally {
                 final String finalResult = resultString;
                 final Exception finalError = currentAsyncError;
-                final String finalRtmpUrl = currentRtmpUrl;
-                final String finalStreamKey = currentStreamKey;
+                // Removed: final String finalRtmpUrl = currentRtmpUrl;
+                // Removed: final String finalStreamKey = currentStreamKey;
                 final String finalBroadcastId = currentBroadcastId;
                 // Capture selectedVideoUri for use in the lambda
                 final Uri finalSelectedVideoUri = selectedVideoUri; // <--- NEW LINE
@@ -902,9 +1528,12 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, finalResult);
 
                         // Use the captured finalSelectedVideoUri
-                        if (finalRtmpUrl != null && finalStreamKey != null && finalBroadcastId != null && finalSelectedVideoUri != null) { // <--- MODIFIED LINE
-                            startRtmpStreaming(finalRtmpUrl, finalStreamKey, finalBroadcastId, finalSelectedVideoUri); // <--- MODIFIED LINE
-                        } else {
+                        if (currentRtmpUrl != null && currentStreamKey != null && finalBroadcastId != null && finalSelectedVideoUri != null) { // <--- MODIFIED LINE
+                            // currentRtmpUrl and currentStreamKey are already static and updated
+
+                            mOutputText.append("\nStream Key (for StreamActivity): " + currentStreamKey); // Show stream key in UI
+                            startRtmpStreaming(currentRtmpUrl, currentStreamKey, finalBroadcastId, finalSelectedVideoUri);
+                        } else { // Check if stream key was not retrieved
                             mOutputText.append("\nFailed to get RTMP details or video URI (Is video selected?).");
                         }
                     } else {
@@ -1029,6 +1658,85 @@ public class MainActivity extends AppCompatActivity {
     private void openVideoSelectionIntent() {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
         selectVideoIntentLauncher.launch(intent);
+    }
+
+    @Override
+    public void onConnectionStarted(@NonNull String s) {
+
+    }
+
+    @Override
+    public void onConnectionSuccess() {
+
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull String s) {
+
+    }
+
+    @Override
+    public void onDisconnect() {
+
+    }
+
+    @Override
+    public void onAuthError() {
+
+    }
+
+    @Override
+    public void onAuthSuccess() {
+
+    }
+
+    @Override
+    public void onAudioDecoderFinished() {
+
+    }
+
+    @Override
+    public void onVideoDecoderFinished() {
+
+    }
+
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+
+    }
+
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+
+    }
+
+    public Uri getFilePath() {
+        return filePath;
+    }
+
+    public void setFilePath(Uri filePath) {
+        this.filePath = filePath;
+    }
+
+    public String getRecordPath() {
+        return recordPath;
+    }
+
+    public void setRecordPath(String recordPath) {
+        this.recordPath = recordPath;
+    }
+
+    public boolean isTouching() {
+        return touching;
+    }
+
+    public void setTouching(boolean touching) {
+        this.touching = touching;
     }
 
     /**
