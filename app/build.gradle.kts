@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+
 }
 
 android {
@@ -67,7 +68,6 @@ android {
     }
 
 
-
     dependencies {
 
         implementation(libs.appcompat)
@@ -123,6 +123,27 @@ android {
             exclude(group = "org.apache.httpcomponents")
         }
 
+        implementation("com.github.pedroSG94.RootEncoder:library:2.6.1")
+        implementation("com.github.pedroSG94.RootEncoder:extra-sources:2.6.1")
+
+
+//FFmpeg
+        implementation("com.mrljdx:ffmpeg-kit-full:6.0")
+//        implementation("clojure-interop:java.awt:1.0.5")
+//        implementation("xuggle:xuggle-xuggler:5.4")
+//        implementation ("com.github.pedroSG94.rtmp-rtsp-stream-client-java:rtplibrary:2.2.4")
+//        implementation ("com.github.pedroSG94.RootEncoder:rtplibrary:2.2.6")
+
 
     }
 }
+dependencies {
+    implementation(libs.appcompat)
+    implementation(libs.material)
+    implementation(libs.activity)
+    implementation(libs.constraintlayout)
+    //noinspection GradlePath
+    implementation(files("C:/Users/HongMingWang/Desktop/Code/Android24hLive-Stream/libs/xuggle-xuggler-5.4.jar"))
+
+}
+

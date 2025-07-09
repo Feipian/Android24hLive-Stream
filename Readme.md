@@ -3,6 +3,7 @@
 
 ## Reference Article:
 
+https://github.com/vvbhandare/YouTube-Live-Demo-Work/blob/master/MyTestProject/src/com/google/api/services/samples/youtube/cmdline/live/CreateBroadcast.java#L88
 https://github.com/pedroSG94/RootEncoder/blob/master/app/src/main/java/com/pedro/streamer/file/FromFileActivity.kt
 https://dev.to/theplebdev/using-android-to-stream-to-twitch-part-2-rtmp-handshake-2o44
 
@@ -18,6 +19,13 @@ https://dev.to/theplebdev/using-android-to-stream-to-twitch-part-2-rtmp-handshak
         // Example of transitioning the broadcast once you are confident streaming will start:
         // Call this AFTER your RTMP library successfully connects and starts sending data
         // transitionBroadcastState(broadcastId, "live");
+
+
+
+## FFmpeg Command:
+
+Windows work: ffmpeg -stream_loop -1 -re -i [YOUR FILE NAME HERE] -pix_fmt yuvj420p -x264-params keyint=48:min-keyint=48:scenecut=-1 -b:v 4500k -b:a 128k -ar 44100 -acodec aac -vcodec libx264 -preset medium -crf 28 -threads 4 -f flv rtmp://[LIVE STREAM RTMP URL]
+
 
 
 - [X] SELECT VIDEO PERMISSION
