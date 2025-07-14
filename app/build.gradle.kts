@@ -128,11 +128,15 @@ android {
 
 
 //FFmpeg
-        implementation("com.mrljdx:ffmpeg-kit-full:6.0")
+//        implementation ("com.arthenica:mobile-ffmpeg-full:4.4")
+//        implementation("com.arthenica:mobile-ffmpeg-full:4.4")
+//        implementation("com.mrljdx:ffmpeg-kit-full:6.0")
 //        implementation("clojure-interop:java.awt:1.0.5")
 //        implementation("xuggle:xuggle-xuggler:5.4")
 //        implementation ("com.github.pedroSG94.rtmp-rtsp-stream-client-java:rtplibrary:2.2.4")
 //        implementation ("com.github.pedroSG94.RootEncoder:rtplibrary:2.2.6")
+//        implementation(files("libs/ffmpeg-kit.aar"))
+
 
 
     }
@@ -142,8 +146,11 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
+    implementation(files("C:\\Users\\HongMingWang\\Desktop\\Code\\Android24hLive-Stream\\libs\\ffmpeg-kit.aar"))
+    implementation("com.arthenica:smart-exception-java:0.2.1")
     //noinspection GradlePath
-    implementation(files("C:/Users/HongMingWang/Desktop/Code/Android24hLive-Stream/libs/xuggle-xuggler-5.4.jar"))
+
+
 
 }
 
