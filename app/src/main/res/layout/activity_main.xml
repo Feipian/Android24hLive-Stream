@@ -1,30 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="16dp"
+    tools:context=".MainActivity"
+    tools:ignore="ExtraText">
 
-    <!-- Button to select videos -->
+    <TextView
+        android:id="@+id/tv_login_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Checking Google login status..."
+        android:textColor="@color/black"
+        android:textSize="16sp"
+        android:layout_margin="8dp"/>
+
     <Button
         android:id="@+id/btn_select_videos"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Select Videos" />
+        android:text="Select Video" />
 
-    <!-- Button to start streaming -->
+
+
+    <Button
+        android:id="@+id/btn_select_existing_BoardCast"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Select Existing Stream" />
     <Button
         android:id="@+id/btn_start_stream"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Start YouTube Stream" />
+
+    <Button
+        android:id="@+id/btn_call_youtube_api"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Call YouTube Data API (Quickstart)" />
+
+    <com.pedro.library.view.OpenGlView
+        android:id="@+id/surfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="300dp" />
+    <SeekBar
+        android:id="@+id/seek_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Streaming" />
+        android:layout_margin="16dp" />
+
+    <TextView
+        android:id="@+id/tv_output"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="vertical"
+        android:text="Click a button to test functionality." />
 
     <VideoView
         android:id="@+id/video_view"
         android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:layout_gravity="center_horizontal"
+        android:layout_height="200dp"
+        android:layout_marginTop="16dp"
         android:visibility="gone" />
 
+
+    <TextView
+        android:id="@+id/boardCastList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 </LinearLayout>
