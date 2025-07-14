@@ -13,6 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
-libs
+/libs
 key
 app/build
+app/debug
+ㄕ
