@@ -17,4 +17,6 @@ local.properties
 key
 app/build
 app/debug
-ㄕ
+
+*.apk
+*.aar
