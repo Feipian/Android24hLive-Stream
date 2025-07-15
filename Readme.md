@@ -181,7 +181,6 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 **Fill in the blanks (especially `YOUR_YOUTUBE_DATA_API_KEY` explanation, repository URL, license) and adjust any details specific to your project's current state.** This document should give anyone a good starting point for using your code.
 
 
-
 ## Reference Article:
 
 https://github.com/vvbhandare/YouTube-Live-Demo-Work/blob/master/MyTestProject/src/com/google/api/services/samples/youtube/cmdline/live/CreateBroadcast.java#L88

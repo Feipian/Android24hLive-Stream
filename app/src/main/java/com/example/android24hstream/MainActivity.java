@@ -1,9 +1,17 @@
 package com.example.android24hstream;
 
 
+import static com.google.android.gms.common.GooglePlayServicesUtilLight.isGooglePlayServicesAvailable;
+
+import static java.lang.Math.max;
+
+import static kotlinx.coroutines.CoroutineScopeKt.CoroutineScope;
+import static kotlinx.coroutines.DelayKt.delay;
+
 import com.arthenica.ffmpegkit.FFmpegKit;
 import com.arthenica.ffmpegkit.FFmpegSession;
 import com.arthenica.ffmpegkit.ReturnCode;
+
 
 import android.Manifest;
 import android.accounts.AccountManager;
@@ -72,12 +80,13 @@ import com.google.api.services.youtube.model.LiveBroadcastSnippet;
 import com.google.api.services.youtube.model.LiveBroadcastStatus;
 import com.google.api.services.youtube.model.LiveStream;
 
+import com.google.api.services.youtube.model.LiveStreamContentDetails;
+
 import com.google.api.services.youtube.model.LiveStreamSnippet;
 import com.google.api.services.youtube.model.Video;
 import com.pedro.common.ConnectChecker;
 import com.pedro.encoder.input.decoder.AudioDecoderInterface;
 import com.pedro.encoder.input.decoder.VideoDecoderInterface;
-
 
 
 import java.io.IOException;
@@ -105,9 +114,12 @@ public class MainActivity extends AppCompatActivity implements
         SeekBar.OnSeekBarChangeListener {
 
 
+
+
     private Uri filePath = null;
     private String recordPath = "";
     private boolean touching = false;
+
 
     private static final String TAG = "YouTubeApp"; // Use a consistent tag for logs
 
@@ -146,10 +158,21 @@ public class MainActivity extends AppCompatActivity implements
     private ActivityResultLauncher<Intent> authorizationLauncher;
     private static String currentRtmpUrl;
     private static String currentStreamKey;
+
     private static String createdBroadcastId; // Declare createdBroadcastId as a class member
+
     private static String  fullRtmpUrl;
 
     boolean streamKeyRetrieved = false; // Flag to check if stream key was retrieved
+
+
+    private static final String CLIENT_SECRETS= "client_secret.json";
+    private static final Collection<String> SCOPES1 =
+            List.of("https://www.googleapis.com/auth/youtube.readonly");
+
+    private static final String APPLICATION_NAME = "API code samples";
+    private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+
 
     private void checkInitialRequirements() {
         // Check Google Play Services availability
@@ -173,6 +196,7 @@ public class MainActivity extends AppCompatActivity implements
         // If all checks pass, you can proceed with your app initialization
         Toast.makeText(this, "All requirements met. Ready to use YouTube API.", Toast.LENGTH_SHORT).show();
     }
+
 
 
     @SuppressLint("MissingInflatedId")
@@ -199,7 +223,9 @@ public class MainActivity extends AppCompatActivity implements
 
 
         // Initialize the status TextView
+
 //        seekBar = findViewById(R.id.seek_bar); // Initialize seekBar here after setContentView
+
         tvLoginStatus = findViewById(R.id.tv_login_status);
 
 
@@ -222,6 +248,7 @@ public class MainActivity extends AppCompatActivity implements
                 Toast.makeText(MainActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
+
         // Initialize ExecutorService and Handler
         executorService = Executors.newFixedThreadPool(2); // Or a cached thread pool if many short tasks
         mainHandler = new Handler(Looper.getMainLooper()); // This handler is tied to the UI thread
@@ -229,6 +256,7 @@ public class MainActivity extends AppCompatActivity implements
         // Initialize UI elements from XML
         Button selectVideoButton = findViewById(R.id.btn_select_videos);
         Button startStreamBtn = findViewById(R.id.btn_start_stream);
+
         mOutputText = findViewById(R.id.tv_output);
         videoView = findViewById(R.id.video_view);
 
@@ -273,6 +301,7 @@ public class MainActivity extends AppCompatActivity implements
                             // After selecting an account, re-attempt the API call
                             getResultsFromApi();
                         }
+
                     } else {
                         Log.w(TAG, "Account selection cancelled or failed.");
                         mOutputText.setText("Account selection cancelled.");
@@ -291,6 +320,7 @@ public class MainActivity extends AppCompatActivity implements
                         mOutputText.setText("Authorization failed.");
                     }
                 });
+
 
         // Launcher for requesting multiple permissions (e.g., GET_ACCOUNTS, video permissions)
         requestVideoPermissionLauncher = registerForActivityResult(
@@ -422,10 +452,12 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
+
         // Initialize MediaController for VideoView
         mediaController = new MediaController(this);
         mediaController.setAnchorView(videoView);
         videoView.setMediaController(mediaController);
+
 
         // Optional: Hide/show media controller on video view click
         videoView.setOnClickListener(v -> {
@@ -434,6 +466,7 @@ public class MainActivity extends AppCompatActivity implements
                     mediaController.hide();
                 } else {
                     mediaController.show(5000); // Show for 5 seconds
+
                 }
             }
         });
@@ -490,6 +523,7 @@ public class MainActivity extends AppCompatActivity implements
                                 broadcast.getStatus().getLifeCycleStatus()
                         ));
                     }
+
                 }
                 // Post result back to UI thread if needed
                 runOnUiThread(() -> showBroadcastSelectionDialog(broadcasts));
@@ -641,6 +675,7 @@ public class MainActivity extends AppCompatActivity implements
 //            throw new RuntimeException("Could not write trailer to output file");
 //        return arrayList;
 //    }
+
     private void createNewYouTubeBroadcast() throws IOException, GeneralSecurityException {
         Log.d(TAG, "Attempting to create a new YouTube Live Broadcast...");
         mOutputText.setText("Creating new YouTube Live Broadcast...");
@@ -745,7 +780,6 @@ public class MainActivity extends AppCompatActivity implements
                         .list("id,snippet,contentDetails,status"); // Request 'id' as well
                 LiveBroadcastListResponse response = request.setId(broadcast.getId()).execute();
 
-
                 // Print information from the API response, including the title and description.
                 if (response != null && response.getItems() != null && !response.getItems().isEmpty()) {
                     LiveBroadcast returnedBroadcastItem = response.getItems().get(0); // Get the first item
@@ -758,6 +792,7 @@ public class MainActivity extends AppCompatActivity implements
                             "  - Scheduled Start Time: " + returnedBroadcastItem.getSnippet().getScheduledStartTime());
                     System.out.println(
                             "  - Scheduled End Time: " + returnedBroadcastItem.getSnippet().getScheduledEndTime());
+
                 }
 
 
@@ -842,6 +877,7 @@ public class MainActivity extends AppCompatActivity implements
 
                             // Ensure FFmpeg execution is on a background thread
                             executorService.execute(() -> {
+
                                 try {
                                     // Loop the video indefinitely
                                     // Basic FFmpeg command (adjust as needed for your video)
@@ -864,8 +900,10 @@ public class MainActivity extends AppCompatActivity implements
                                     // -f flv: output format for RTMP
                                     // String[] cmd = {"ffmpeg", "-re", "-i", inputVideoPath, "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", "-f", "flv", rtmpOutputUrl};
                                     // String ffmpegPath = getApplicationInfo().nativeLibraryDir + java.io.File.separator + "libffmpeg.so";
+
                                     // More robust command for potentially incompatible videos: Using h264_mediacodec for hardware acceleration on Android if available.
                                     String command = String.format("-stream_loop -1 -re -i \"%s\" -pix_fmt yuvj420p -g 48 -keyint_min 48 -sc_threshold 0 -b:v 4500k -b:a 128k -ar 44100 -acodec aac -f flv \"%s\" ", inputVideoPath, rtmpOutputUrl);
+
 
 
                                     // Execute FFmpeg command using FFmpegKit
@@ -1161,7 +1199,6 @@ public class MainActivity extends AppCompatActivity implements
     }
 
 
-
     /**
      * Attempt to call the API, after verifying that all the preconditions are
      * satisfied. The preconditions are: Google Play Services installed, an
@@ -1169,6 +1206,7 @@ public class MainActivity extends AppCompatActivity implements
      * of the preconditions are not satisfied, the app will prompt the user as
      * appropriate.
      */
+
     @SuppressLint("SetTextI18n")
     private void getResultsFromApi() {
         if (!isGooglePlayServicesAvailable()) {
@@ -1201,6 +1239,7 @@ public class MainActivity extends AppCompatActivity implements
         } else {
             // Request the GET_ACCOUNTS permission
             requestVideoPermissionLauncher.launch(new String[]{Manifest.permission.GET_ACCOUNTS});
+
         }
     }
 
