@@ -1,2 +1,0 @@
-app/debug/app-debug.apk filter=lfs diff=lfs merge=lfs -text
-libs/Android24hStream.zip filter=lfs diff=lfs merge=lfs -text
