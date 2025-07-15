@@ -1,5 +1,6 @@
 package com.example.android24hstream;
 
+
 import static com.google.android.gms.common.GooglePlayServicesUtilLight.isGooglePlayServicesAvailable;
 
 import static java.lang.Math.max;
@@ -10,18 +11,7 @@ import static kotlinx.coroutines.DelayKt.delay;
 import com.arthenica.ffmpegkit.FFmpegKit;
 import com.arthenica.ffmpegkit.FFmpegSession;
 import com.arthenica.ffmpegkit.ReturnCode;
-import com.xuggle.xuggler.Configuration;
-import com.xuggle.xuggler.ICodec;
-import com.xuggle.xuggler.IContainer;
-import com.xuggle.xuggler.IContainerFormat;
-import com.xuggle.xuggler.IPacket;
-import com.xuggle.xuggler.IPixelFormat;
-import com.xuggle.xuggler.IRational;
-import com.xuggle.xuggler.IStream;
-import com.xuggle.xuggler.IStreamCoder;
-import com.xuggle.xuggler.IVideoPicture;
-import com.xuggle.xuggler.video.ConverterFactory;
-import com.xuggle.xuggler.video.IConverter;
+
 
 import android.Manifest;
 import android.accounts.AccountManager;
@@ -47,8 +37,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageView;
+
 import android.widget.MediaController;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -90,28 +79,27 @@ import com.google.api.services.youtube.model.LiveBroadcastListResponse;
 import com.google.api.services.youtube.model.LiveBroadcastSnippet;
 import com.google.api.services.youtube.model.LiveBroadcastStatus;
 import com.google.api.services.youtube.model.LiveStream;
+
 import com.google.api.services.youtube.model.LiveStreamContentDetails;
+
 import com.google.api.services.youtube.model.LiveStreamSnippet;
 import com.google.api.services.youtube.model.Video;
 import com.pedro.common.ConnectChecker;
 import com.pedro.encoder.input.decoder.AudioDecoderInterface;
 import com.pedro.encoder.input.decoder.VideoDecoderInterface;
-import com.pedro.library.generic.GenericFromFile;
-import com.pedro.library.view.OpenGlView;
-
 
 
 import java.io.IOException;
-import java.io.InputStream;
+
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+
 import java.util.List;
-import java.util.Properties;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.SeekBar;
@@ -125,22 +113,13 @@ public class MainActivity extends AppCompatActivity implements
         AudioDecoderInterface,
         SeekBar.OnSeekBarChangeListener {
 
-    private GenericFromFile genericFromFile;
-    private ImageView bStream;
-    private ImageView bSelectFile;
-    private ImageView bReSync;
-    private ImageView bRecord;
-    private SeekBar seekBar;
-    private EditText etUrl;
-    private TextView tvFileName;
-    private OpenGlView openGlView;
 
-    private static YouTube youtube;
+
+
     private Uri filePath = null;
     private String recordPath = "";
     private boolean touching = false;
 
-    private ActivityResultLauncher<String> activityResult;
 
     private static final String TAG = "YouTubeApp"; // Use a consistent tag for logs
 
@@ -179,9 +158,13 @@ public class MainActivity extends AppCompatActivity implements
     private ActivityResultLauncher<Intent> authorizationLauncher;
     private static String currentRtmpUrl;
     private static String currentStreamKey;
+
+    private static String createdBroadcastId; // Declare createdBroadcastId as a class member
+
     private static String  fullRtmpUrl;
 
     boolean streamKeyRetrieved = false; // Flag to check if stream key was retrieved
+
 
     private static final String CLIENT_SECRETS= "client_secret.json";
     private static final Collection<String> SCOPES1 =
@@ -189,6 +172,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final String APPLICATION_NAME = "API code samples";
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+
 
     private void checkInitialRequirements() {
         // Check Google Play Services availability
@@ -212,6 +196,7 @@ public class MainActivity extends AppCompatActivity implements
         // If all checks pass, you can proceed with your app initialization
         Toast.makeText(this, "All requirements met. Ready to use YouTube API.", Toast.LENGTH_SHORT).show();
     }
+
 
 
     @SuppressLint("MissingInflatedId")
@@ -238,7 +223,9 @@ public class MainActivity extends AppCompatActivity implements
 
 
         // Initialize the status TextView
-        seekBar = findViewById(R.id.seek_bar); // Initialize seekBar here after setContentView
+
+//        seekBar = findViewById(R.id.seek_bar); // Initialize seekBar here after setContentView
+
         tvLoginStatus = findViewById(R.id.tv_login_status);
 
 
@@ -251,6 +238,17 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
+        // btn_create_new_broadcast
+        Button btnCreateNewBroadcast = findViewById(R.id.btn_create_new_broadcast);
+        btnCreateNewBroadcast.setOnClickListener(v -> {
+            try {
+                createNewYouTubeBroadcast();
+            } catch (IOException | GeneralSecurityException e) {
+                Log.e(TAG, "Error creating new broadcast", e);
+                Toast.makeText(MainActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
+
         // Initialize ExecutorService and Handler
         executorService = Executors.newFixedThreadPool(2); // Or a cached thread pool if many short tasks
         mainHandler = new Handler(Looper.getMainLooper()); // This handler is tied to the UI thread
@@ -258,7 +256,7 @@ public class MainActivity extends AppCompatActivity implements
         // Initialize UI elements from XML
         Button selectVideoButton = findViewById(R.id.btn_select_videos);
         Button startStreamBtn = findViewById(R.id.btn_start_stream);
-        Button callYoutubeApiButton = findViewById(R.id.btn_call_youtube_api);
+
         mOutputText = findViewById(R.id.tv_output);
         videoView = findViewById(R.id.video_view);
 
@@ -303,6 +301,7 @@ public class MainActivity extends AppCompatActivity implements
                             // After selecting an account, re-attempt the API call
                             getResultsFromApi();
                         }
+
                     } else {
                         Log.w(TAG, "Account selection cancelled or failed.");
                         mOutputText.setText("Account selection cancelled.");
@@ -321,6 +320,7 @@ public class MainActivity extends AppCompatActivity implements
                         mOutputText.setText("Authorization failed.");
                     }
                 });
+
 
         // Launcher for requesting multiple permissions (e.g., GET_ACCOUNTS, video permissions)
         requestVideoPermissionLauncher = registerForActivityResult(
@@ -452,17 +452,12 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-        callYoutubeApiButton.setOnClickListener(v -> {
-            callYoutubeApiButton.setEnabled(false);
-            mOutputText.setText("");
-            getResultsFromApi(); // Initiate the Quickstart API call
-            callYoutubeApiButton.setEnabled(true); // Re-enable after initiation (AsyncTask runs in background)
-        });
 
         // Initialize MediaController for VideoView
         mediaController = new MediaController(this);
         mediaController.setAnchorView(videoView);
         videoView.setMediaController(mediaController);
+
 
         // Optional: Hide/show media controller on video view click
         videoView.setOnClickListener(v -> {
@@ -471,6 +466,7 @@ public class MainActivity extends AppCompatActivity implements
                     mediaController.hide();
                 } else {
                     mediaController.show(5000); // Show for 5 seconds
+
                 }
             }
         });
@@ -527,6 +523,7 @@ public class MainActivity extends AppCompatActivity implements
                                 broadcast.getStatus().getLifeCycleStatus()
                         ));
                     }
+
                 }
                 // Post result back to UI thread if needed
                 runOnUiThread(() -> showBroadcastSelectionDialog(broadcasts));
@@ -536,45 +533,6 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-    }
-    private void updateProgress() {
-        mainHandler.post(() -> {
-           Log.d("updateProgress", "updateProgress called") ;
-        });
-        int maxDuration = Math.max(
-                (int) genericFromFile.getVideoDuration(),
-                (int) genericFromFile.getAudioDuration()
-        );
-        mainHandler.post(() -> {
-            Log.d("updateProgress", "maxDuration: " + maxDuration);
-        });
-        if (seekBar != null) {
-            seekBar.setMax(maxDuration);
-        }
-
-        executorService.execute(() -> {
-            while (genericFromFile.isStreaming() || genericFromFile.isRecording()) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    break;
-                }
-
-                if (!touching) {
-                    int progress = Math.max(
-                            (int) genericFromFile.getVideoTime(),
-                            (int) genericFromFile.getAudioTime()
-                    );
-
-                    mainHandler.post(() -> {
-                        if (seekBar != null) {
-                            seekBar.setProgress(progress);
-                        }
-                    });
-                }
-            }
-        });
     }
 
 
@@ -718,6 +676,83 @@ public class MainActivity extends AppCompatActivity implements
 //        return arrayList;
 //    }
 
+    private void createNewYouTubeBroadcast() throws IOException, GeneralSecurityException {
+        Log.d(TAG, "Attempting to create a new YouTube Live Broadcast...");
+        mOutputText.setText("Creating new YouTube Live Broadcast...");
+        mProgress.setMessage("Creating new live broadcast...");
+        mProgress.show();
+
+        executorService.execute(() -> {
+            Exception currentAsyncError = null;
+
+            String resultMessage = null;
+
+            try {
+                // --- 1. Define Live Broadcast Details ---
+                LiveBroadcast liveBroadcast = new LiveBroadcast();
+
+                // Snippet
+                LiveBroadcastSnippet snippet = new LiveBroadcastSnippet();
+                snippet.setTitle("New Android Live Event - " + System.currentTimeMillis());
+                snippet.setDescription("This is a new live event created from the Android app.");
+                // Set scheduled start time (e.g., 5 minutes from now)
+                snippet.setScheduledStartTime(new DateTime(System.currentTimeMillis() + 5 * 60 * 1000));
+                // Set scheduled end time (e.g., 1 hour after start time)
+                snippet.setScheduledEndTime(new DateTime(System.currentTimeMillis() + 5 * 60 * 1000 + 60 * 60 * 1000));
+                liveBroadcast.setSnippet(snippet);
+
+                // Status
+                LiveBroadcastStatus status = new LiveBroadcastStatus();
+                status.setPrivacyStatus("public"); // or "public" or "private"
+                liveBroadcast.setStatus(status);
+
+                // Content Details (optional, but good for more control)
+                LiveBroadcastContentDetails contentDetails = new LiveBroadcastContentDetails();
+                contentDetails.setEnableAutoStart(true); // Manually transition to "live"
+                contentDetails.setEnableDvr(true);
+                contentDetails.setRecordFromStart(true);
+                liveBroadcast.setContentDetails(contentDetails);
+
+                // --- 2. Insert the Live Broadcast ---
+                YouTube.LiveBroadcasts.Insert broadcastInsertRequest = youtubeService.liveBroadcasts()
+                        .insert("snippet,status,contentDetails", liveBroadcast);
+                LiveBroadcast returnedBroadcast = broadcastInsertRequest.execute();
+
+                createdBroadcastId = returnedBroadcast.getId();
+                resultMessage = "Successfully created new broadcast: " + returnedBroadcast.getSnippet().getTitle() + " (ID: " + createdBroadcastId + ")";
+                Log.d(TAG, resultMessage);
+
+            } catch (GooglePlayServicesAvailabilityIOException e) {
+                currentAsyncError = e;
+                mainHandler.post(() -> showGooglePlayServicesAvailabilityErrorDialog(e.getConnectionStatusCode()));
+            } catch (UserRecoverableAuthIOException e) {
+                currentAsyncError = e;
+                mainHandler.post(() -> authorizationLauncher.launch(e.getIntent()));
+            } catch (IOException e) {
+                currentAsyncError = e;
+                resultMessage = "Error creating broadcast: " + e.getMessage();
+                Log.e(TAG, "Error creating new YouTube broadcast", e);
+            } finally {
+                final String finalResultMessage = resultMessage;
+                final Exception finalError = currentAsyncError;
+                mainHandler.post(() -> {
+                    mProgress.dismiss();
+                    if (finalError != null && !(finalError instanceof UserRecoverableAuthIOException)) {
+                        mOutputText.setText(finalResultMessage);
+                    } else if (finalResultMessage != null) {
+                        mOutputText.setText(finalResultMessage);
+                        Toast.makeText(MainActivity.this, "New broadcast created!", Toast.LENGTH_LONG).show();
+                        // Guide user to select the newly created broadcast if they want to use it
+                        Toast.makeText(MainActivity.this, "Click 'Select Existing Broadcast' to use it.", Toast.LENGTH_LONG).show();
+                        // Optionally, you could automatically trigger the selection dialog
+                        // selectExistingBoardCast(); // Be mindful of API rate limits and user experience
+                    }
+                });
+            }
+        });
+    }
+
+    @SuppressLint("SetTextI18n")
     private void onBroadcastSelected(YouTubeBroadcast broadcast) {
         Log.d("SelectedBroadcast", "ID: " + broadcast.getId() + ", Title: " + broadcast.getTitle());
         // Example: Start streaming to this broadcast
@@ -729,9 +764,6 @@ public class MainActivity extends AppCompatActivity implements
             Toast.makeText(this, "Please select a video first.", Toast.LENGTH_LONG).show();
             return;
         }
-
-        // Create a new stream and bind it to the selected broadcast
-        final String selectedBroadcastId = broadcast.getId();
         // Removed: String currentRtmpUrl = null; and String currentStreamKey = null; as they are now static members
         executorService.execute(() -> {
             Exception currentAsyncError = null;
@@ -743,70 +775,10 @@ public class MainActivity extends AppCompatActivity implements
             });
 
             try {
-//                // Define the LiveStream object, which will be uploaded as the request body.
-//                LiveStream liveStream = new LiveStream();
 
-//                // Add the cdn object property to the LiveStream object.
-//                CdnSettings cdn = new CdnSettings();
-//                cdn.setFrameRate("60fps");
-//                cdn.setIngestionType("rtmp");
-//                cdn.setResolution("1080p");
-//                liveStream.setCdn(cdn);
-
-//                // Add the contentDetails object property to the LiveStream object.
-//                LiveStreamContentDetails contentDetails = new LiveStreamContentDetails();
-//                contentDetails.setIsReusable(true);
-//                liveStream.setContentDetails(contentDetails);
-
-//                // Add the snippet object property to the LiveStream object.
-//                LiveStreamSnippet snippet = new LiveStreamSnippet();
-//                snippet.setDescription("A description of your video stream. This field is optional.");
-//                snippet.setTitle("Your new video stream's name");
-//                liveStream.setSnippet(snippet);
-
-//                // Define and execute the API request
-//                YouTube.LiveStreams.Insert request = youtubeService.liveStreams()
-//                        .insert("snippet,cdn,contentDetails,status", liveStream);
-//                LiveStream returnStream = request.setKey(BuildConfig.API_KEY).execute();
-//                System.out.println(returnStream);
-
-
-//                // --- NEW CODE: Extract RTMP URL and Stream Key ---
-//                if (returnStream != null && returnStream.getCdn() != null && returnStream.getCdn().getIngestionInfo() != null) {
-//                    currentRtmpUrl = returnStream.getCdn().getIngestionInfo().getIngestionAddress();
-//                    currentStreamKey = returnStream.getCdn().getIngestionInfo().getStreamName(); // Save the stream key
-//                    streamKeyRetrieved = true; // This flag confirms we got the key
-//                    // set up the stream URL with the key
-//                    fullRtmpUrl = currentRtmpUrl + "/" + currentStreamKey;
-//                    mainHandler.post(() -> {
-//                        Log.d(TAG, "Successfully created stream. RTMP URL: " + currentRtmpUrl + ", Stream Key: " + currentStreamKey);
-//                        System.out.println("Successfully created stream. RTMP URL: " + currentRtmpUrl + ", Stream Key: " + currentStreamKey);
-//                    });
-
-                // When selecting an existing broadcast, we don't insert a new one.
-                // We use the 'broadcast' object passed to this method (which is the selected one).
-                // So, the insert operation below is not needed here.
-                // YouTube.LiveBroadcasts.Insert liveBroadcastInsert =
-                //         youtubeService.liveBroadcasts().insert("snippet,status", broadcast); // Use youtubeService
-//                LiveBroadcast returnedBroadcast = broadcast; // The selected broadcast IS the returnedBroadcast for this context
                 YouTube.LiveBroadcasts.List request = youtubeService.liveBroadcasts()
                         .list("id,snippet,contentDetails,status"); // Request 'id' as well
                 LiveBroadcastListResponse response = request.setId(broadcast.getId()).execute();
-
-//                // --- Set Scheduled Start and End Times ---
-//                LiveBroadcast broadcastToUpdate = response.getItems().get(0); // Get the broadcast to update
-//                LiveBroadcastSnippet snippet = broadcastToUpdate.getSnippet();
-//                // Set scheduled start time to 1 minute from now
-//                snippet.setScheduledStartTime(new DateTime(System.currentTimeMillis() + 60 * 1000));
-//                // Set scheduled end time to 1 hour after the new start time
-//                snippet.setScheduledEndTime(new DateTime(System.currentTimeMillis() + 60 * 1000 + 60 * 60 * 1000));
-//                broadcastToUpdate.setSnippet(snippet);
-//
-//                // Update the broadcast with the new times
-//                YouTube.LiveBroadcasts.Update updateRequest = youtubeService.liveBroadcasts().update("snippet", broadcastToUpdate);
-//                LiveBroadcast updatedBroadcast = updateRequest.execute();
-
-
 
                 // Print information from the API response, including the title and description.
                 if (response != null && response.getItems() != null && !response.getItems().isEmpty()) {
@@ -820,11 +792,7 @@ public class MainActivity extends AppCompatActivity implements
                             "  - Scheduled Start Time: " + returnedBroadcastItem.getSnippet().getScheduledStartTime());
                     System.out.println(
                             "  - Scheduled End Time: " + returnedBroadcastItem.getSnippet().getScheduledEndTime());
-                    // You can also display these on the UI if needed:
-                    // mainHandler.post(() -> {
-                    //     mOutputText.append("\nSelected Broadcast Title: " + returnedBroadcastItem.getSnippet().getTitle());
-                    //     mOutputText.append("\nSelected Broadcast Description: " + returnedBroadcastItem.getSnippet().getDescription());
-                    // });
+
                 }
 
 
@@ -909,7 +877,7 @@ public class MainActivity extends AppCompatActivity implements
 
                             // Ensure FFmpeg execution is on a background thread
                             executorService.execute(() -> {
-                                Process process = null;
+
                                 try {
                                     // Loop the video indefinitely
                                     // Basic FFmpeg command (adjust as needed for your video)
@@ -932,8 +900,10 @@ public class MainActivity extends AppCompatActivity implements
                                     // -f flv: output format for RTMP
                                     // String[] cmd = {"ffmpeg", "-re", "-i", inputVideoPath, "-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", "-f", "flv", rtmpOutputUrl};
                                     // String ffmpegPath = getApplicationInfo().nativeLibraryDir + java.io.File.separator + "libffmpeg.so";
-                                    // More robust command for potentially incompatible videos:
-                                    String command = String.format("-stream_loop -1 -re -i \"%s\" -pix_fmt yuvj420p -g 48 -keyint_min 48 -sc_threshold 0 -b:v 4500k -b:a 128k -ar 44100 -acodec aac -vcodec h264_mediacodec -preset medium -crf 28 -threads 4 -f flv \"%s\" ", inputVideoPath, rtmpOutputUrl);
+
+                                    // More robust command for potentially incompatible videos: Using h264_mediacodec for hardware acceleration on Android if available.
+                                    String command = String.format("-stream_loop -1 -re -i \"%s\" -pix_fmt yuvj420p -g 48 -keyint_min 48 -sc_threshold 0 -b:v 4500k -b:a 128k -ar 44100 -acodec aac -f flv \"%s\" ", inputVideoPath, rtmpOutputUrl);
+
 
 
                                     // Execute FFmpeg command using FFmpegKit
@@ -1229,78 +1199,6 @@ public class MainActivity extends AppCompatActivity implements
     }
 
 
-    @SuppressLint("SetTextI18n")
-    private void getResultsFromApiAsync() {
-        mOutputText.setText("");
-        mProgress.setMessage("Calling YouTube Data API (Quickstart)...");
-        mProgress.show();
-
-        executorService.execute(() -> { // This code runs on a background thread
-            List<String> output = null;
-            Exception currentError = null;
-
-            try {
-                YouTube mService = youtubeService; // Use the initialized service
-                List<String> channelInfo = new ArrayList<>();
-                ChannelListResponse result = mService.channels().list("snippet,contentDetails,statistics")
-                        .setForUsername("GoogleDevelopers")
-                        .execute();
-                List<Channel> channels = result.getItems();
-                if (channels != null && !channels.isEmpty()) {
-                    Channel channel = channels.get(0);
-                    channelInfo.add("This channel's ID is " + channel.getId() + ". " +
-                            "Its title is '" + channel.getSnippet().getTitle() + "', " +
-                            "and it has " + channel.getStatistics().getViewCount() + " views.");
-                }
-                output = channelInfo;
-
-            } catch (GooglePlayServicesAvailabilityIOException e) {
-                currentError = e;
-                // Post to main thread to show dialog
-                mainHandler.post(() -> {
-                    showGooglePlayServicesAvailabilityErrorDialog(e.getConnectionStatusCode());
-                });
-            } catch (UserRecoverableAuthIOException e) {
-                currentError = e;
-                // Post to main thread to launch authorization intent
-                mainHandler.post(() -> {
-                    authorizationLauncher.launch(e.getIntent());
-                });
-            } catch (IOException e) {
-                currentError = e;
-                // Post error message to main thread
-                mainHandler.post(() -> {
-                    mOutputText.setText("The following error occurred (Quickstart API):\n" + e.getMessage());
-                    Log.e(TAG, "Quickstart API error", e);
-                });
-            } catch (Exception e) {
-                currentError = e;
-                // Catch any other unexpected exceptions
-                mainHandler.post(() -> {
-                    mOutputText.setText("An unexpected error occurred (Quickstart API):\n" + e.getMessage());
-                    Log.e(TAG, "Quickstart API unexpected error", e);
-                });
-            } finally {
-                // Dismiss progress dialog and update UI on main thread
-                Exception finalCurrentError = currentError;
-                List<String> finalOutput = output;
-                mainHandler.post(() -> {
-                    mProgress.hide();
-                    if (finalCurrentError == null && finalOutput != null) {
-                        if (finalOutput.isEmpty()) {
-                            mOutputText.setText("No results returned from Quickstart API.");
-                        } else {
-                            finalOutput.add(0, "Data retrieved using the YouTube Data API (Quickstart):");
-                            mOutputText.setText(TextUtils.join("\n", finalOutput));
-                        }
-                    } else if (finalCurrentError == null) { // This case handles cancel, or if output is null for other reasons not caught
-                        mOutputText.setText("Quickstart API Request cancelled or no result.");
-                    }
-                });
-            }
-        });
-    }
-
     /**
      * Attempt to call the API, after verifying that all the preconditions are
      * satisfied. The preconditions are: Google Play Services installed, an
@@ -1308,6 +1206,8 @@ public class MainActivity extends AppCompatActivity implements
      * of the preconditions are not satisfied, the app will prompt the user as
      * appropriate.
      */
+
+    @SuppressLint("SetTextI18n")
     private void getResultsFromApi() {
         if (!isGooglePlayServicesAvailable()) {
             acquireGooglePlayServices();
@@ -1339,6 +1239,7 @@ public class MainActivity extends AppCompatActivity implements
         } else {
             // Request the GET_ACCOUNTS permission
             requestVideoPermissionLauncher.launch(new String[]{Manifest.permission.GET_ACCOUNTS});
+
         }
     }
 

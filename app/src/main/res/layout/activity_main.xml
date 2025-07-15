@@ -8,6 +8,7 @@
     tools:context=".MainActivity"
     tools:ignore="ExtraText">
 
+
     <TextView
         android:id="@+id/tv_login_status"
         android:layout_width="wrap_content"
@@ -16,6 +17,13 @@
         android:textColor="@color/black"
         android:textSize="16sp"
         android:layout_margin="8dp"/>
+
+    <Button
+        android:id="@+id/btn_create_new_broadcast"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Create new Broadcast" />
+
 
     <Button
         android:id="@+id/btn_select_videos"
@@ -33,24 +41,11 @@
     <Button
         android:id="@+id/btn_start_stream"
         android:layout_width="wrap_content"
+
         android:layout_height="wrap_content"
         android:text="Start YouTube Stream" />
 
-    <Button
-        android:id="@+id/btn_call_youtube_api"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Call YouTube Data API (Quickstart)" />
 
-    <com.pedro.library.view.OpenGlView
-        android:id="@+id/surfaceView"
-        android:layout_width="match_parent"
-        android:layout_height="300dp" />
-    <SeekBar
-        android:id="@+id/seek_bar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp" />
 
     <TextView
         android:id="@+id/tv_output"

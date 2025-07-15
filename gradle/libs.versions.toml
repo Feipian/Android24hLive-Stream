@@ -18,6 +18,9 @@ playServicesAuth = "21.3.0"
 playServicesAuthVersion = "20.7.0"
 rtplibrary = "2.2.5"
 
+mobileFfmpegFull = "4.4"
+
+
 [libraries]
 activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activity" }
 appcompat-v7 = { module = "com.android.support:appcompat-v7", version.ref = "appcompatV7" }
@@ -37,6 +40,9 @@ constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayo
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 play-services-auth-v2070 = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuthVersion" }
 rtplibrary = { module = "com.github.pedroSG94.rtmp-rtsp-stream-client-java:rtplibrary", version.ref = "rtplibrary" }
+
+mobile-ffmpeg-full = { group = "com.arthenica", name = "mobile-ffmpeg-full", version.ref = "mobileFfmpegFull" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
